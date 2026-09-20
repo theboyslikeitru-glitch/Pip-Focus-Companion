@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Пип — фокус-компаньон</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --pet-1: #a3f0e0;
+    --pet-2: #5fd4c0;
+    --pet-glow: 163, 240, 224;
+    --accent: var(--pet-1);
+
+    --bg-1: #0e0e17;
+    --bg-2: #050507;
+    --fg: #ffffff;
+    --fg-dim: rgba(255,255,255,0.55);
+    --fg-mute: rgba(255,255,255,0.35);
+    --surface: rgba(255,255,255,0.055);
+    --surface-hover: rgba(255,255,255,0.11);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 20% 10%, rgba(var(--pet-glow), 0.14) 0%, transparent 50%),
+      radial-gradient(circle at 85% 90%, rgba(var(--pet-glow), 0.08) 0%, transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.8s ease;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    align-items: center;
+  }
+
+  /* ============== TOPBAR ============== */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .pet-name-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pet-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+  @keyframes dotPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.8); }
+  }
+
+  .level-badge {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+    font-weight: 600;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .char-picker {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .char-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background 0.2s ease, transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    filter: grayscale(0.4) opacity(0.6);
+  }
+  .char-btn:hover {
+    filter: grayscale(0) opacity(1);
+    transform: scale(1.1);
+    background: rgba(255,255,255,0.06);
+  }
+  .char-btn.active {
+    background: rgba(var(--pet-glow), 0.18);
+    filter: grayscale(0) opacity(1);
+    box-shadow: 0 0 12px rgba(var(--pet-glow), 0.4);
+  }
+
+  .streak {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-dim);
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: var(--surface);
+    transition: background 0.3s ease;
+  }
+  .streak.hot {
+    background: rgba(255, 140, 60, 0.15);
+    color: #ffb066;
+  }
+  .streak.hot .flame { animation: flame 1.4s ease-in-out infinite; }
+  @keyframes flame {
+    0%, 100% { transform: scale(1) rotate(-3deg); }
+    50% { transform: scale(1.15) rotate(3deg); }
+  }
+
+  /* ============== СЦЕНА ============== */
+  .stage {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    max-width: 480px;
+    width: 100%;
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 32px;
+    background: radial-gradient(circle at 50% 40%, rgba(var(--pet-glow), 0.1), transparent 65%);
+    overflow: hidden;
+  }
+
+  .stage::before {
+    content: '';
+    position: absolute;
+    bottom: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 8%;
+    background: radial-gradient(ellipse, rgba(var(--pet-glow), 0.5), transparent 70%);
+    filter: blur(20px);
+    transition: opacity 0.5s ease;
+    opacity: 0.7;
+  }
+  .stage.focused::before {
+    opacity: 1;
+    animation: groundGlow 2.4s ease-in-out infinite;
+  }
+  @keyframes groundGlow {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.15); }
+  }
+
+  .pet-wrapper {
+    position: relative;
+    width: 78%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    will-change: transform;
+    animation: idleBounce 3.2s ease-in-out infinite;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    transform-origin: center bottom;
+  }
+  .pet-wrapper:active { cursor: grabbing; }
+
+  @keyframes idleBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .pet-wrapper.focused { animation: focusBounce 1.6s ease-in-out infinite; }
+  @keyframes focusBounce {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    50% { transform: translateY(-10px) scale(0.97, 1.04); }
+  }
+
+  .pet-wrapper.sleepy { animation: sleepyBreath 5s ease-in-out infinite; }
+  @keyframes sleepyBreath {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    50% { transform: translateY(2px) scale(1.02, 0.98); }
+  }
+
+  .pet-wrapper.sad { animation: sadBounce 4s ease-in-out infinite; }
+  @keyframes sadBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+  }
+
+  .pet-wrapper.snapping {
+    transition: transform 0.55s cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  .pet-wrapper.react-jump {
+    animation: reactJump 0.9s cubic-bezier(.3,1.4,.5,1) !important;
+  }
+  @keyframes reactJump {
+    0% { transform: translateY(0) scale(1, 1); }
+    30% { transform: translateY(-50px) scale(0.9, 1.15); }
+    60% { transform: translateY(0) scale(1.15, 0.85); }
+    80% { transform: translateY(-14px) scale(0.97, 1.05); }
+    100% { transform: translateY(0) scale(1, 1); }
+  }
+
+  .pet-wrapper.react-click {
+    animation: reactClick 0.45s cubic-bezier(.3,1.4,.5,1) !important;
+  }
+  @keyframes reactClick {
+    0% { transform: scale(1, 1); }
+    30% { transform: scale(1.18, 0.86); }
+    60% { transform: scale(0.94, 1.08); }
+    100% { transform: scale(1, 1); }
+  }
+
+  .pet-wrapper.react-stretch {
+    animation: reactStretch 0.7s ease-out !important;
+  }
+  @keyframes reactStretch {
+    0% { transform: scale(1, 1); }
+    40% { transform: scale(0.92, 1.12); }
+    100% { transform: scale(1, 1); }
+  }
+
+  .pet-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    transition: filter 0.4s ease;
+    pointer-events: none;
+  }
+
+  .pet-body-path { transition: fill 0.6s ease; }
+
+  .eyes { opacity: 0; transition: opacity 0.22s ease; }
+  .eyes.visible { opacity: 1; }
+
+  .pupil { transition: transform 0.1s ease-out; }
+
+  .mouth { opacity: 0; transition: opacity 0.22s ease; }
+  .mouth.visible { opacity: 1; }
+
+  .blush { transition: opacity 0.5s ease; }
+
+  .zzz {
+    position: absolute;
+    top: 8%;
+    right: 14%;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    opacity: 0;
+    letter-spacing: -0.1em;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .stage.sleepy .zzz { opacity: 0.85; animation: zzzFloat 3s ease-in-out infinite; }
+
+  @keyframes zzzFloat {
+    0% { transform: translate(0, 0) scale(0.9); opacity: 0.4; }
+    50% { transform: translate(6px, -12px) scale(1.1); opacity: 0.9; }
+    100% { transform: translate(0, 0) scale(0.9); opacity: 0.4; }
+  }
+
+  .particle {
+    position: absolute;
+    pointer-events: none;
+    font-size: 18px;
+    user-select: none;
+    animation: particleRise 1.8s ease-out forwards;
+    z-index: 2;
+  }
+  @keyframes particleRise {
+    0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: translate(var(--dx, 0px), -100px) scale(1.1); opacity: 0; }
+  }
+
+  .drag-hint {
+    position: absolute;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    opacity: 0.5;
+  }
+  .stage.played .drag-hint { opacity: 0; }
+
+  /* ============== ТАЙМЕР ============== */
+  .timer-card {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 36px 34px;
+    border-radius: 32px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+
+  .modes {
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 999px;
+    align-self: flex-start;
+  }
+
+  .mode-btn {
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--fg-dim);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.25s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mode-btn:hover { color: var(--fg); }
+  .mode-btn.active { background: rgba(255,255,255,0.1); color: var(--fg); }
+
+  .clock {
+    font-size: clamp(56px, 9vw, 88px);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.6) 140%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .clock.warning { background: linear-gradient(180deg, #ffb066 0%, #ff6b6b 140%); -webkit-background-clip: text; background-clip: text; }
+  .clock.blink { animation: clockBlink 1s ease-in-out infinite; }
+  @keyframes clockBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .timer-state {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+    margin-top: -14px;
+    transition: color 0.3s ease;
+  }
+  .timer-state.active { color: var(--accent); }
+
+  .timer-controls { display: flex; gap: 10px; align-items: center; }
+
+  .btn-primary {
+    flex: 1;
+    padding: 16px 22px;
+    border-radius: 18px;
+    border: none;
+    background: linear-gradient(135deg, var(--pet-1), var(--pet-2));
+    color: #0a0a12;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.3s ease, filter 0.2s ease;
+    box-shadow: 0 10px 30px rgba(var(--pet-glow), 0.25);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 38px rgba(var(--pet-glow), 0.45);
+    filter: brightness(1.05);
+  }
+  .btn-primary:active { transform: translateY(0) scale(0.98); }
+  .btn-primary.running {
+    background: rgba(255,255,255,0.09);
+    color: var(--fg);
+    box-shadow: none;
+  }
+  .btn-primary.running:hover { background: rgba(255,255,255,0.14); }
+
+  .btn-ghost {
+    width: 54px; height: 54px;
+    border-radius: 18px;
+    border: none;
+    background: rgba(255,255,255,0.05);
+    color: var(--fg-dim);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-ghost svg { width: 18px; height: 18px; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--fg); transform: translateY(-2px); }
+  .btn-ghost:active { transform: translateY(0) scale(0.95); }
+
+  .goal { display: flex; flex-direction: column; gap: 10px; }
+  .goal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-dim);
+  }
+  .goal-head .num { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .goal-head .target { color: var(--fg-mute); }
+  .goal-bar { height: 8px; border-radius: 8px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .goal-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--pet-1), var(--pet-2));
+    box-shadow: 0 0 14px rgba(var(--pet-glow), 0.6);
+    transition: width 0.6s cubic-bezier(.3,.9,.4,1);
+  }
+
+  .xp-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .xp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-dim);
+  }
+  .xp-head .stage-name { color: var(--fg); }
+  .xp-head .xp-num { font-variant-numeric: tabular-nums; }
+  .xp-bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .xp-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 6px;
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(var(--pet-glow), 0.6);
+    transition: width 0.6s cubic-bezier(.3,.9,.4,1), background 0.6s ease;
+  }
+
+  /* ============== FOOTER ============== */
+  .footer {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 4px;
+    font-size: 12px;
+    color: var(--fg-mute);
+    font-weight: 500;
+  }
+
+  .footer-stats { display: flex; gap: 22px; flex-wrap: wrap; }
+  .stat b { color: var(--fg-dim); font-weight: 600; margin-right: 4px; }
+  .stat span { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .footer-actions { display: flex; gap: 8px; }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--fg-dim);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+  .icon-btn svg { width: 15px; height: 15px; }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--fg); }
+  .icon-btn.muted { color: var(--fg-mute); opacity: 0.5; }
+  .icon-btn.active {
+    background: rgba(var(--pet-glow), 0.16);
+    color: var(--pet-1);
+    box-shadow: 0 0 12px rgba(var(--pet-glow), 0.35);
+  }
+  .icon-btn.pulse::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    animation: pulseRing 1.8s ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes pulseRing {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* ============== SETTINGS ============== */
+  .settings-panel {
+    grid-column: 1 / -1;
+    padding: 22px 24px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: none;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .settings-panel.open { display: flex; }
+
+  .setting {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--fg-dim);
+    font-weight: 600;
+  }
+
+  .setting input[type="number"],
+  .setting input[type="text"] {
+    width: 100px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .setting input[type="number"] { width: 64px; }
+  .setting input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--pet-glow), 0.15);
+  }
+
+  .setting input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    outline: none;
+  }
+  .setting input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(var(--pet-glow), 0.6);
+  }
+  .setting input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  .reset-btn {
+    margin-left: auto;
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 100, 100, 0.25);
+    background: rgba(255, 100, 100, 0.06);
+    color: #ff8080;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .reset-btn:hover { background: rgba(255, 100, 100, 0.14); }
+
+  /* ============== MODAL (Achievements) ============== */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+    animation: fadeIn 0.25s ease;
+  }
+  .modal.open { display: flex; }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: 720px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    padding: 26px 28px;
+    border-radius: 26px;
+    background: linear-gradient(180deg, rgba(30,30,45,0.95), rgba(15,15,25,0.98));
+    border: 1px solid rgba(var(--pet-glow), 0.2);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(var(--pet-glow), 0.1);
+    animation: modalIn 0.4s cubic-bezier(.3,1.3,.5,1);
+  }
+  @keyframes modalIn {
+    from { transform: scale(0.92) translateY(20px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+  .modal-title {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .modal-title h2 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .modal-count {
+    font-size: 12px;
+    color: var(--fg-dim);
+    font-weight: 700;
+    padding: 4px 10px;
+    background: var(--surface);
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+  .modal-close {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--fg-dim);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    line-height: 1;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .modal-close:hover { background: var(--surface-hover); color: var(--fg); }
+
+  .ach-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    overflow-y: auto;
+    padding: 4px 8px 4px 4px;
+    margin: -4px;
+    flex: 1;
+  }
+  .ach-grid::-webkit-scrollbar { width: 6px; }
+  .ach-grid::-webkit-scrollbar-track { background: transparent; }
+  .ach-grid::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+
+  .ach-card {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.3s ease;
+    align-items: flex-start;
+  }
+  .ach-card.locked {
+    opacity: 0.45;
+  }
+  .ach-card.unlocked {
+    background: linear-gradient(135deg, rgba(var(--pet-glow), 0.12), rgba(255,255,255,0.02));
+    border-color: rgba(var(--pet-glow), 0.3);
+    box-shadow: 0 0 20px rgba(var(--pet-glow), 0.08) inset;
+  }
+  .ach-icon {
+    font-size: 26px;
+    flex-shrink: 0;
+    line-height: 1;
+    filter: drop-shadow(0 0 8px rgba(var(--pet-glow), 0.3));
+  }
+  .ach-card.locked .ach-icon {
+    filter: grayscale(1) brightness(0.6);
+  }
+  .ach-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .ach-name { font-size: 13px; font-weight: 700; }
+  .ach-desc { font-size: 11px; color: var(--fg-dim); line-height: 1.35; }
+  .ach-card.unlocked .ach-desc { color: rgba(255,255,255,0.65); }
+
+  /* ============== TOASTS ============== */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 200;
+    pointer-events: none;
+  }
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px 14px 14px;
+    background: linear-gradient(135deg, rgba(30,30,45,0.95), rgba(20,20,35,0.98));
+    border: 1px solid rgba(var(--pet-glow), 0.35);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 40px rgba(var(--pet-glow), 0.2);
+    animation: toastIn 0.55s cubic-bezier(.3,1.4,.5,1);
+    pointer-events: auto;
+    min-width: 280px;
+    max-width: 340px;
+  }
+  .toast.leaving {
+    animation: toastOut 0.4s ease forwards;
+  }
+  .toast .t-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 0 10px rgba(var(--pet-glow), 0.5));
+    flex-shrink: 0;
+  }
+  .toast .t-body { min-width: 0; }
+  .toast .t-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 800;
+    margin-bottom: 3px;
+  }
+  .toast .t-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .toast .t-desc { font-size: 11px; color: var(--fg-dim); line-height: 1.3; }
+  @keyframes toastIn {
+    from { transform: translateX(400px) scale(0.9); opacity: 0; }
+    to { transform: translateX(0) scale(1); opacity: 1; }
+  }
+  @keyframes toastOut {
+    to { transform: translateX(400px) scale(0.9); opacity: 0; }
+  }
+
+  /* Music indicator mini equalizer */
+  .eq {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+    margin-left: 2px;
+  }
+  .eq span {
+    display: block;
+    width: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    animation: eqBar 0.8s ease-in-out infinite;
+  }
+  .eq span:nth-child(1) { animation-delay: -0.2s; height: 60%; }
+  .eq span:nth-child(2) { animation-delay: -0.5s; height: 100%; }
+  .eq span:nth-child(3) { animation-delay: -0.1s; height: 40%; }
+  @keyframes eqBar {
+    0%, 100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
+  }
+
+  /* ============== ADAPTIVE ============== */
+  @media (max-width: 840px) {
+    body { padding: 20px 18px; }
+    .app { grid-template-columns: 1fr; gap: 18px; padding-bottom: 40px; }
+    .stage { max-width: 340px; }
+    .timer-card { padding: 28px 24px; gap: 18px; }
+    .toast-container { left: 20px; right: 20px; }
+    .toast { min-width: 0; }
+  }
+  @media (max-width: 420px) {
+    .stage { max-width: 260px; }
+    .clock { font-size: 64px; }
+    .char-btn { width: 30px; height: 30px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<main class="app">
+
+  <div class="topbar">
+    <div class="pet-name-badge">
+      <div class="pet-dot"></div>
+      <span id="petName">Пип</span>
+      <span class="level-badge" id="levelBadge">Семечко</span>
+    </div>
+    <div class="topbar-right">
+      <div class="char-picker" id="charPicker"></div>
+      <div class="streak" id="streakBadge">
+        <span class="flame">🔥</span>
+        <span id="streakText">0 дней подряд</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="pet-wrapper" id="petWrapper">
+      <svg class="pet-svg" id="petSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="zzz">z z</div>
+    </div>
+    <div class="drag-hint" id="dragHint">Погладь · Потяни</div>
+  </div>
+
+  <div class="timer-card">
+    <div class="modes">
+      <button class="mode-btn active" data-mode="focus">Фокус</button>
+      <button class="mode-btn" data-mode="short">Перерыв</button>
+      <button class="mode-btn" data-mode="long">Отдых</button>
+    </div>
+
+    <div class="clock" id="clock">25:00</div>
+    <div class="timer-state" id="timerState">Готов начать</div>
+
+    <div class="timer-controls">
+      <button class="btn-primary" id="startBtn">Начать фокус</button>
+      <button class="btn-ghost" id="resetBtn" title="Сброс" aria-label="Сброс">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 3-6.7"/>
+          <polyline points="3 3 3 9 9 9"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="goal">
+      <div class="goal-head">
+        <span>Сегодня</span>
+        <span><span class="num" id="todayMin">0</span> <span class="target">/ <span id="goalMin">60</span> мин</span></span>
+      </div>
+      <div class="goal-bar"><div class="goal-fill" id="goalFill"></div></div>
+    </div>
+
+    <div class="xp-block">
+      <div class="xp-head">
+        <span class="stage-name" id="stageName">Семечко</span>
+        <span class="xp-num"><span id="xpNow">0</span> / <span id="xpNext">10</span> XP</span>
+      </div>
+      <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-stats">
+      <div class="stat"><b>Всего:</b><span id="totalStat">0ч 0м</span></div>
+      <div class="stat"><b>Сессий:</b><span id="sessionsStat">0</span></div>
+      <div class="stat"><b>Лучший стрик:</b><span id="bestStreakStat">0</span></div>
+    </div>
+    <div class="footer-actions">
+      <button class="icon-btn" id="musicBtn" title="Lofi музыка" aria-label="Lofi музыка">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="pipBtn" title="Мини-таймер (поверх окон)" aria-label="Мини-таймер">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>
+          <rect x="2" y="12" width="12" height="8" rx="1.5" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="achBtn" title="Достижения" aria-label="Достижения">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h12v6a6 6 0 0 1-12 0V3z"/>
+          <path d="M6 5H3a3 3 0 0 0 3 5"/>
+          <path d="M18 5h3a3 3 0 0 1-3 5"/>
+          <path d="M9 21h6"/>
+          <path d="M12 15v6"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="soundBtn" title="Звуки интерфейса" aria-label="Звуки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" title="Настройки" aria-label="Настройки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <label class="setting">
+      Имя:
+      <input type="text" id="nameInput" maxlength="16">
+    </label>
+    <label class="setting">
+      Фокус, мин:
+      <input type="number" id="focusInput" min="1" max="180" step="1">
+    </label>
+    <label class="setting">
+      Цель дня, мин:
+      <input type="number" id="goalInput" min="10" max="600" step="5">
+    </label>
+    <label class="setting">
+      Lofi:
+      <input type="range" id="musicVolInput" min="0" max="100" step="1" value="45">
+    </label>
+    <button class="reset-btn" id="resetAllBtn">Сбросить прогресс</button>
+  </div>
+
+</main>
+
+<!-- ACHIEVEMENTS MODAL -->
+<div class="modal" id="achModal">
+  <div class="modal-content">
+    <div class="modal-head">
+      <div class="modal-title">
+        <h2>🏆 Достижения</h2>
+        <span class="modal-count" id="achCount">0 / 0</span>
+      </div>
+      <button class="modal-close" id="achClose" aria-label="Закрыть">×</button>
+    </div>
+    <div class="ach-grid" id="achGrid"></div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* =========================================================
+   ПЕРСОНАЖИ — у каждого своя палитра
+========================================================= */
+function eyesSVG(cxL, cyL, cxR, cyR) {
+  return `
+    <g class="eyes eyes-normal">
+      <ellipse cx="${cxL}" cy="${cyL}" rx="9" ry="12" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR}" rx="9" ry="12" fill="#16162a"/>
+      <circle class="pupil" cx="${cxL}" cy="${cyL}" r="3.2" fill="white"/>
+      <circle class="pupil" cx="${cxR}" cy="${cyR}" r="3.2" fill="white"/>
+    </g>
+    <g class="eyes eyes-happy">
+      <path d="M ${cxL-10} ${cyL} Q ${cxL} ${cyL-10} ${cxL+10} ${cyL}" stroke="#16162a" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M ${cxR-10} ${cyR} Q ${cxR} ${cyR-10} ${cxR+10} ${cyR}" stroke="#16162a" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="eyes eyes-sleepy">
+      <ellipse cx="${cxL}" cy="${cyL+2}" rx="9" ry="5" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR+2}" rx="9" ry="5" fill="#16162a"/>
+    </g>
+    <g class="eyes eyes-sad">
+      <ellipse cx="${cxL}" cy="${cyL+4}" rx="8" ry="10" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR+4}" rx="8" ry="10" fill="#16162a"/>
+      <circle cx="${cxL}" cy="${cyL+7}" r="2.6" fill="white"/>
+      <circle cx="${cxR}" cy="${cyR+7}" r="2.6" fill="white"/>
+      <path d="M ${cxL-12} ${cyL-8} Q ${cxL} ${cyL-12} ${cxL+8} ${cyL-6}" stroke="#16162a" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M ${cxR+12} ${cyR-8} Q ${cxR} ${cyR-12} ${cxR-8} ${cyR-6}" stroke="#16162a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="eyes eyes-blink">
+      <line x1="${cxL-10}" y1="${cyL}" x2="${cxL+10}" y2="${cyL}" stroke="#16162a" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="${cxR-10}" y1="${cyR}" x2="${cxR+10}" y2="${cyR}" stroke="#16162a" stroke-width="3.5" stroke-linecap="round"/>
+    </g>
+  `;
+}
+
+function mouthSVG(cx, cy) {
+  return `
+    <path class="mouth mouth-normal" d="M ${cx-12} ${cy} Q ${cx} ${cy+9} ${cx+12} ${cy}" stroke="#16162a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path class="mouth mouth-happy" d="M ${cx-16} ${cy-2} Q ${cx} ${cy+18} ${cx+16} ${cy-2}" stroke="#16162a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path class="mouth mouth-sad" d="M ${cx-12} ${cy+8} Q ${cx} ${cy-2} ${cx+12} ${cy+8}" stroke="#16162a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <line class="mouth mouth-focused" x1="${cx-10}" y1="${cy+4}" x2="${cx+10}" y2="${cy+4}" stroke="#16162a" stroke-width="3" stroke-linecap="round"/>
+  `;
+}
+
+function blushSVG(cxL, cxR, cy) {
+  return `
+    <ellipse class="blush" cx="${cxL}" cy="${cy}" rx="14" ry="9" fill="url(#blushGrad)"/>
+    <ellipse class="blush" cx="${cxR}" cy="${cy}" rx="14" ry="9" fill="url(#blushGrad)"/>
+  `;
+}
+
+const DEFS = `
+  <defs>
+    <radialGradient id="bodyGrad" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="var(--pet-1)"/>
+      <stop offset="100%" stop-color="var(--pet-2)"/>
+    </radialGradient>
+    <radialGradient id="blushGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,140,180,0.7)"/>
+      <stop offset="100%" stop-color="rgba(255,140,180,0)"/>
+    </radialGradient>
+  </defs>
+`;
+
+const CHARACTERS = {
+  pip: {
+    name: 'Пип',
+    emoji: '🌱',
+    color: { c1: '#a3f0e0', c2: '#5fd4c0', glow: '163,240,224' }, // mint
+    body: 'M 100 28 C 148 28, 174 60, 174 106 C 174 152, 146 174, 100 174 C 54 174, 26 152, 26 106 C 26 60, 52 28, 100 28 Z',
+    back: '',
+    decor: `<ellipse cx="76" cy="58" rx="26" ry="14" fill="rgba(255,255,255,0.35)" transform="rotate(-25 76 58)"/>`,
+    eyesY: 100, mouthY: 124, blushY: 118
+  },
+
+  cat: {
+    name: 'Мяу',
+    emoji: '🐱',
+    color: { c1: '#ffb3d9', c2: '#f06fa8', glow: '255,179,217' }, // rose
+    body: 'M 100 28 C 148 28, 174 60, 174 106 C 174 152, 146 174, 100 174 C 54 174, 26 152, 26 106 C 26 60, 52 28, 100 28 Z',
+    back: `
+      <path d="M 58 55 L 46 12 L 88 34 Z" fill="url(#bodyGrad)"/>
+      <path d="M 142 55 L 154 12 L 112 34 Z" fill="url(#bodyGrad)"/>
+      <path d="M 63 50 L 55 24 L 80 38 Z" fill="rgba(255,220,235,0.5)"/>
+      <path d="M 137 50 L 145 24 L 120 38 Z" fill="rgba(255,220,235,0.5)"/>
+    `,
+    decor: `
+      <ellipse cx="76" cy="58" rx="26" ry="14" fill="rgba(255,255,255,0.3)" transform="rotate(-25 76 58)"/>
+      <path d="M 28 152 Q 0 168 12 185" stroke="url(#bodyGrad)" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.9"/>
+      <path d="M 100 122 L 92 128 L 100 132 L 108 128 Z" fill="#ff7aa8"/>
+    `,
+    eyesY: 98, mouthY: 128, blushY: 116
+  },
+
+  frog: {
+    name: 'Ква',
+    emoji: '🐸',
+    color: { c1: '#b8f5a0', c2: '#6fce48', glow: '184,245,160' }, // lime
+    body: 'M 100 50 C 155 50, 178 78, 178 118 C 178 156, 148 178, 100 178 C 52 178, 22 156, 22 118 C 22 78, 45 50, 100 50 Z',
+    back: `
+      <circle cx="60" cy="48" r="22" fill="url(#bodyGrad)"/>
+      <circle cx="140" cy="48" r="22" fill="url(#bodyGrad)"/>
+      <circle cx="60" cy="48" r="13" fill="rgba(255,255,255,0.12)"/>
+      <circle cx="140" cy="48" r="13" fill="rgba(255,255,255,0.12)"/>
+    `,
+    decor: `<ellipse cx="70" cy="72" rx="22" ry="11" fill="rgba(255,255,255,0.28)" transform="rotate(-20 70 72)"/>`,
+    eyesY: 48, mouthY: 130, blushY: 122,
+    eyesX: { l: 60, r: 140 },
+    specialEyes: true
+  },
+
+  ghost: {
+    name: 'Бу',
+    emoji: '👻',
+    color: { c1: '#c5b3ff', c2: '#9070e8', glow: '197,179,255' }, // lavender
+    body: 'M 40 60 Q 40 22 100 22 Q 160 22 160 60 L 160 155 Q 150 175 140 155 Q 130 135 120 155 Q 110 175 100 155 Q 90 135 80 155 Q 70 175 60 155 Q 50 135 40 155 Z',
+    back: '',
+    decor: `<ellipse cx="76" cy="52" rx="24" ry="13" fill="rgba(255,255,255,0.4)" transform="rotate(-22 76 52)"/>`,
+    eyesY: 100, mouthY: 124, blushY: 118,
+    opacity: 0.88
+  }
+};
+
+/* =========================================================
+   СТАДИИ (только названия и XP, цвет задаёт персонаж)
+========================================================= */
+const STAGES = [
+  { name: 'Семечко',   minXP: 0    },
+  { name: 'Росток',    minXP: 10   },
+  { name: 'Малыш',     minXP: 45   },
+  { name: 'Кроха',     minXP: 150  },
+  { name: 'Подросток', minXP: 420  },
+  { name: 'Взрослый',  minXP: 900  },
+  { name: 'Мудрец',    minXP: 1800 },
+  { name: 'Легенда',   minXP: 3600 }
+];
+
+/* =========================================================
+   ДОСТИЖЕНИЯ
+========================================================= */
+const ACHIEVEMENTS = [
+  { id: 's_1',    icon: '🌱', name: 'Первая сессия', desc: 'Заверши свою первую фокус-сессию', check: s => s.sessions >= 1 },
+  { id: 's_10',   icon: '🎯', name: 'Разогрев', desc: 'Заверши 10 сессий', check: s => s.sessions >= 10 },
+  { id: 's_50',   icon: '🎖️', name: 'Серьёзный подход', desc: 'Заверши 50 сессий', check: s => s.sessions >= 50 },
+  { id: 's_100',  icon: '🏅', name: 'Сотка', desc: 'Заверши 100 сессий', check: s => s.sessions >= 100 },
+  { id: 's_500',  icon: '👑', name: 'Мастер фокуса', desc: 'Заверши 500 сессий', check: s => s.sessions >= 500 },
+
+  { id: 't_1h',   icon: '⏱️', name: 'Час силы', desc: '1 час концентрации', check: s => s.totalFocusSeconds >= 3600 },
+  { id: 't_10h',  icon: '⏳', name: 'Десять часов', desc: '10 часов концентрации', check: s => s.totalFocusSeconds >= 36000 },
+  { id: 't_50h',  icon: '🕰️', name: 'Полсотни', desc: '50 часов концентрации', check: s => s.totalFocusSeconds >= 180000 },
+  { id: 't_100h', icon: '💎', name: 'Сто часов', desc: '100 часов концентрации', check: s => s.totalFocusSeconds >= 360000 },
+
+  { id: 'st_3',   icon: '🔥', name: 'Три дня подряд', desc: 'Стрик 3 дня', check: s => s.bestStreak >= 3 },
+  { id: 'st_7',   icon: '🔥', name: 'Неделя', desc: 'Стрик 7 дней подряд', check: s => s.bestStreak >= 7 },
+  { id: 'st_30',  icon: '🌋', name: 'Месяц', desc: 'Стрик 30 дней подряд', check: s => s.bestStreak >= 30 },
+  { id: 'st_100', icon: '☄️', name: 'Сто дней', desc: 'Стрик 100 дней подряд', check: s => s.bestStreak >= 100 },
+
+  { id: 'stg_2',  icon: '🌿', name: 'Росток', desc: 'Достигни стадии Росток', check: s => s.xp >= 10 },
+  { id: 'stg_5',  icon: '🚀', name: 'Подросток', desc: 'Достигни стадии Подросток', check: s => s.xp >= 420 },
+  { id: 'stg_7',  icon: '🧙', name: 'Мудрец', desc: 'Достигни стадии Мудрец', check: s => s.xp >= 1800 },
+  { id: 'stg_8',  icon: '✨', name: 'Легенда', desc: 'Достигни стадии Легенда', check: s => s.xp >= 3600 },
+
+  { id: 'g_1',    icon: '✅', name: 'Цель дня', desc: 'Выполни дневную цель фокуса', check: s => {
+    const today = todayKey();
+    return (s.daily[today] || 0) >= s.goalMin * 60;
+  }},
+  { id: 'g_7',    icon: '📅', name: 'Продуктивная неделя', desc: '7 дней с выполненной целью', check: s => {
+    let count = 0;
+    for (const k in s.daily) if (s.daily[k] >= s.goalMin * 60) count++;
+    return count >= 7;
+  }},
+  { id: 'g_30',   icon: '🗓️', name: 'Продуктивный месяц', desc: '30 дней с выполненной целью', check: s => {
+    let count = 0;
+    for (const k in s.daily) if (s.daily[k] >= s.goalMin * 60) count++;
+    return count >= 30;
+  }}
+];
+
+/* =========================================================
+   ХРАНИЛИЩЕ
+========================================================= */
+const STORAGE_KEY = 'pip-focus-companion-v3';
+
+const defaultState = {
+  petName: 'Пип',
+  character: 'pip',
+  xp: 0,
+  totalFocusSeconds: 0,
+  sessions: 0,
+  focusDuration: 25 * 60,
+  shortBreak: 5 * 60,
+  longBreak: 15 * 60,
+  goalMin: 60,
+  soundOn: true,
+  musicVolume: 45,
+  daily: {},
+  streak: 0,
+  bestStreak: 0,
+  lastFocusDate: null,
+  achievements: []
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...defaultState };
+    const parsed = JSON.parse(raw);
+    return { ...defaultState, ...parsed };
+  } catch { return { ...defaultState }; }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+
+let state = loadState();
+
+/* =========================================================
+   ТАЙМЕР
+========================================================= */
+const timer = {
+  mode: 'focus',
+  duration: state.focusDuration,
+  remaining: state.focusDuration,
+  running: false,
+  endAt: null
+};
+
+/* =========================================================
+   DOM
+========================================================= */
+const $ = id => document.getElementById(id);
+const clockEl        = $('clock');
+const timerStateEl   = $('timerState');
+const startBtn       = $('startBtn');
+const resetBtn       = $('resetBtn');
+const modeBtns       = document.querySelectorAll('.mode-btn');
+const stageEl        = $('stage');
+const petWrapper     = $('petWrapper');
+const petSvg         = $('petSvg');
+const petNameEl      = $('petName');
+const levelBadge     = $('levelBadge');
+const stageNameEl    = $('stageName');
+const xpNowEl        = $('xpNow');
+const xpNextEl       = $('xpNext');
+const xpFill         = $('xpFill');
+const todayMinEl     = $('todayMin');
+const goalMinEl      = $('goalMin');
+const goalFill       = $('goalFill');
+const totalStatEl    = $('totalStat');
+const sessionsStatEl = $('sessionsStat');
+const bestStreakEl   = $('bestStreakStat');
+const streakBadge    = $('streakBadge');
+const streakText     = $('streakText');
+const soundBtn       = $('soundBtn');
+const musicBtn       = $('musicBtn');
+const pipBtn         = $('pipBtn');
+const achBtn         = $('achBtn');
+const settingsBtn    = $('settingsBtn');
+const settingsPanel  = $('settingsPanel');
+const nameInput      = $('nameInput');
+const focusInput     = $('focusInput');
+const goalInput      = $('goalInput');
+const musicVolInput  = $('musicVolInput');
+const resetAllBtn    = $('resetAllBtn');
+const charPicker     = $('charPicker');
+const dragHint       = $('dragHint');
+const achModal       = $('achModal');
+const achGrid        = $('achGrid');
+const achCount       = $('achCount');
+const achClose       = $('achClose');
+const toastContainer = $('toastContainer');
+
+/* =========================================================
+   УТИЛИТЫ
+========================================================= */
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todaySeconds() { return state.daily[todayKey()] || 0; }
+
+function formatDuration(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}ч ${m}м`;
+  return `${m}м`;
+}
+function formatClock(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function getStage() {
+  let stage = STAGES[0];
+  for (const s of STAGES) if (state.xp >= s.minXP) stage = s;
+  return stage;
+}
+function getNextStage() {
+  for (const s of STAGES) if (state.xp < s.minXP) return s;
+  return null;
+}
+function pluralDays(n) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'день';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'дня';
+  return 'дней';
+}
+
+/* ---------- цветовые утилиты ---------- */
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h, s, l];
+}
+function hslToHex(h, s, l) {
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+function boostHex(hex, satMul, lightMul) {
+  const [h, s, l] = hexToHsl(hex);
+  return hslToHex(h, Math.min(1, s * satMul), Math.min(0.95, l * lightMul));
+}
+
+/* =========================================================
+   РЕНДЕР ПИТОМЦА
+========================================================= */
+function renderPet() {
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  const ey = ch.eyesY;
+  const eyL = ch.specialEyes ? ch.eyesX.l : 72;
+  const eyR = ch.specialEyes ? ch.eyesX.r : 128;
+  const opacity = ch.opacity || 1;
+
+  petSvg.innerHTML = `
+    ${DEFS}
+    <ellipse id="petShadow" cx="100" cy="182" rx="52" ry="7" fill="rgba(0,0,0,0.35)"/>
+    <g opacity="${opacity}">
+      ${ch.back}
+      <path class="pet-body-path" id="petBody" d="${ch.body}" fill="url(#bodyGrad)"/>
+      ${ch.decor}
+    </g>
+    ${blushSVG(52, 148, ch.blushY)}
+    ${eyesSVG(eyL, ey, eyR, ey)}
+    ${mouthSVG(100, ch.mouthY)}
+  `;
+  bindPupils();
+  applyMood(currentMood);
+}
+
+let pupils = [];
+function bindPupils() {
+  pupils = document.querySelectorAll('.pupil');
+}
+
+/* =========================================================
+   ЦВЕТА — от персонажа + оттенок от стадии
+========================================================= */
+function applyStageColors() {
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  const stage = getStage();
+  const stageIdx = STAGES.indexOf(stage);
+  const satBoost = 0.78 + (stageIdx / 7) * 0.37;
+  const lightBoost = 0.94 + (stageIdx / 7) * 0.10;
+
+  const c1 = boostHex(ch.color.c1, satBoost, lightBoost);
+  const c2 = boostHex(ch.color.c2, satBoost, lightBoost);
+
+  const glowArr = ch.color.glow.split(',').map(Number);
+  const glowBoosted = glowArr.map(v => Math.min(255, Math.round(v * lightBoost)));
+  const glowStr = glowBoosted.join(',');
+
+  const root = document.documentElement;
+  root.style.setProperty('--pet-1', c1);
+  root.style.setProperty('--pet-2', c2);
+  root.style.setProperty('--pet-glow', glowStr);
+  root.style.setProperty('--bg-1', `rgb(${mix(glowStr, [14,14,23], 0.7)})`);
+
+  updatePipTheme();
+}
+function mix(rgbStr, baseRgb, ratio) {
+  const c = rgbStr.split(',').map(Number);
+  return c.map((v, i) => Math.round(v * (1 - ratio) + baseRgb[i] * ratio));
+}
+
+/* =========================================================
+   ЭМОЦИИ
+========================================================= */
+const MOODS = {
+  focused: { eyes: 'normal', mouth: 'focused' },
+  happy:   { eyes: 'happy',  mouth: 'happy' },
+  content: { eyes: 'normal', mouth: 'happy' },
+  neutral: { eyes: 'normal', mouth: 'normal' },
+  sleepy:  { eyes: 'sleepy', mouth: 'normal' },
+  sad:     { eyes: 'sad',    mouth: 'sad' },
+  blink:   { eyes: 'blink',  mouth: 'normal' }
+};
+
+let currentMood = 'neutral';
+let tempEmotion = null;
+let tempEmotionTimeout = null;
+
+function computeMood() {
+  const todaySec = todaySeconds();
+  const goalSec = state.goalMin * 60;
+  const hour = new Date().getHours();
+
+  if (state.lastFocusDate && state.lastFocusDate < yesterdayKey()) return 'sad';
+  if (todaySec === 0 && (hour >= 21 || hour < 6)) return 'sleepy';
+  if (todaySec >= goalSec) return 'happy';
+  if (todaySec > 0) return 'content';
+  return 'neutral';
+}
+
+function applyMood(mood) {
+  const m = MOODS[mood] || MOODS.neutral;
+  currentMood = mood;
+
+  document.querySelectorAll('.eyes').forEach(g => g.classList.remove('visible'));
+  document.querySelectorAll('.mouth').forEach(g => g.classList.remove('visible'));
+
+  const eyeGroup = document.querySelector(`.eyes-${m.eyes}`);
+  const mouthGroup = document.querySelector(`.mouth-${m.mouth}`);
+  if (eyeGroup) eyeGroup.classList.add('visible');
+  if (mouthGroup) mouthGroup.classList.add('visible');
+
+  petWrapper.classList.remove('focused', 'sleepy', 'sad');
+  stageEl.classList.remove('focused', 'sleepy');
+  if (mood === 'focused') {
+    petWrapper.classList.add('focused');
+    stageEl.classList.add('focused');
+  } else if (mood === 'sleepy') {
+    petWrapper.classList.add('sleepy');
+    stageEl.classList.add('sleepy');
+  } else if (mood === 'sad') {
+    petWrapper.classList.add('sad');
+  }
+
+  document.querySelectorAll('.blush').forEach(el => {
+    el.style.opacity = (mood === 'happy') ? '1' : (mood === 'focused' ? '0.8' : '0.55');
+  });
+}
+
+function setTemporaryEmotion(emotion, duration = 2000) {
+  tempEmotion = emotion;
+  applyMood(emotion);
+  clearTimeout(tempEmotionTimeout);
+  tempEmotionTimeout = setTimeout(() => {
+    tempEmotion = null;
+    applyMood(computeMood());
+  }, duration);
+}
+
+/* =========================================================
+   МОРГАНИЕ
+========================================================= */
+function blink() {
+  if (tempEmotion === 'sleepy' || currentMood === 'sleepy') return;
+  const visible = document.querySelector('.eyes.visible');
+  if (!visible) return;
+  if (visible.classList.contains('eyes-blink')) return;
+
+  visible.classList.remove('visible');
+  const blinkGroup = document.querySelector('.eyes-blink');
+  if (blinkGroup) blinkGroup.classList.add('visible');
+
+  setTimeout(() => {
+    if (blinkGroup) blinkGroup.classList.remove('visible');
+    visible.classList.add('visible');
+  }, 130);
+}
+
+function startBlinking() {
+  function schedule() {
+    const delay = 2200 + Math.random() * 4500;
+    setTimeout(() => { blink(); schedule(); }, delay);
+  }
+  schedule();
+}
+
+/* =========================================================
+   АВТОНОМНЫЕ ЭМОЦИИ
+========================================================= */
+let lastInteraction = Date.now();
+
+function startIdleBehavior() {
+  setInterval(() => {
+    if (tempEmotion) return;
+    if (isDragging) return;
+
+    const idle = Date.now() - lastInteraction;
+    if (idle > 40000 && !(timer.running && timer.mode === 'focus')) {
+      if (currentMood !== 'sleepy') setTemporaryEmotion('sleepy', 25000);
+      return;
+    }
+    if (timer.running && timer.mode === 'focus') return;
+    if (Math.random() < 0.32) {
+      const options = ['happy', 'neutral', 'content', 'sleepy'];
+      const pick = options[Math.floor(Math.random() * options.length)];
+      setTemporaryEmotion(pick, 2500 + Math.random() * 3000);
+    }
+  }, 5500);
+}
+
+/* =========================================================
+   РЕНДЕР ИНТЕРФЕЙСА
+========================================================= */
+function render() {
+  petNameEl.textContent = state.petName;
+
+  const stage = getStage();
+  const next = getNextStage();
+  levelBadge.textContent = stage.name;
+  stageNameEl.textContent = stage.name;
+
+  xpNowEl.textContent = state.xp;
+  if (next) {
+    xpNextEl.textContent = next.minXP;
+    const progress = (state.xp - stage.minXP) / (next.minXP - stage.minXP);
+    xpFill.style.width = (progress * 100).toFixed(1) + '%';
+  } else {
+    xpNextEl.textContent = '∞';
+    xpFill.style.width = '100%';
+  }
+
+  const todayMin = Math.floor(todaySeconds() / 60);
+  todayMinEl.textContent = todayMin;
+  goalMinEl.textContent = state.goalMin;
+  goalFill.style.width = Math.min(100, (todayMin / state.goalMin) * 100).toFixed(1) + '%';
+
+  totalStatEl.textContent = formatDuration(state.totalFocusSeconds);
+  sessionsStatEl.textContent = state.sessions;
+  bestStreakEl.textContent = state.bestStreak;
+
+  streakText.textContent = `${state.streak} ${pluralDays(state.streak)} подряд`;
+  if (state.streak >= 2) streakBadge.classList.add('hot');
+  else streakBadge.classList.remove('hot');
+
+  applyMood(tempEmotion || computeMood());
+  applyStageColors();
+  updatePipUI();
+
+  if (document.activeElement !== nameInput) nameInput.value = state.petName;
+  if (document.activeElement !== focusInput) focusInput.value = Math.round(state.focusDuration / 60);
+  if (document.activeElement !== goalInput) goalInput.value = state.goalMin;
+}
+
+/* =========================================================
+   ВЫБОР ПЕРСОНАЖА
+========================================================= */
+function buildCharPicker() {
+  charPicker.innerHTML = '';
+  Object.keys(CHARACTERS).forEach(key => {
+    const c = CHARACTERS[key];
+    const btn = document.createElement('button');
+    btn.className = 'char-btn';
+    btn.title = c.name;
+    btn.textContent = c.emoji;
+    btn.dataset.char = key;
+    if (key === state.character) btn.classList.add('active');
+    btn.addEventListener('click', () => selectCharacter(key));
+    charPicker.appendChild(btn);
+  });
+}
+
+function selectCharacter(key) {
+  if (!CHARACTERS[key]) return;
+
+  const oldDefault = CHARACTERS[state.character]?.name;
+  const wasDefaultName = state.petName === oldDefault;
+
+  state.character = key;
+  if (wasDefaultName || !state.petName) {
+    state.petName = CHARACTERS[key].name;
+  }
+
+  saveState();
+  renderPet();
+  render();
+  buildCharPicker();
+
+  petWrapper.classList.add('react-jump');
+  setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  spawnParticles(['✨', '👋', '💫'], 4);
+  playSound('click');
+  lastInteraction = Date.now();
+}
+
+/* =========================================================
+   КЛИК / DRAG
+========================================================= */
+let isDragging = false;
+let dragStart = null;
+let hasMoved = false;
+
+function handlePointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  isDragging = true;
+  hasMoved = false;
+  const p = getPointFromEvent(e);
+  dragStart = { x: p.x, y: p.y };
+  petWrapper.style.animation = 'none';
+  petWrapper.classList.remove('snapping');
+}
+
+function getPointFromEvent(e) {
+  if (e.touches && e.touches[0]) {
+    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  return { x: e.clientX, y: e.clientY };
+}
+
+function handlePointerMove(e) {
+  if (!isDragging || !dragStart) return;
+  const p = getPointFromEvent(e);
+  const dx = p.x - dragStart.x;
+  const dy = p.y - dragStart.y;
+
+  if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) hasMoved = true;
+  if (!hasMoved) return;
+  if (e.cancelable) e.preventDefault();
+
+  const stretchX = Math.max(0.6, Math.min(1.7, 1 + dx / 190));
+  const stretchY = Math.max(0.6, Math.min(1.7, 1 + dy / 190));
+  const sx = stretchX / Math.sqrt(Math.max(0.1, stretchY));
+  const sy = stretchY / Math.sqrt(Math.max(0.1, stretchX));
+  const clampedX = Math.max(0.55, Math.min(1.75, sx));
+  const clampedY = Math.max(0.55, Math.min(1.75, sy));
+  const rotate = Math.max(-12, Math.min(12, dx * 0.045));
+
+  petWrapper.style.transform = `scale(${clampedX.toFixed(3)}, ${clampedY.toFixed(3)}) rotate(${rotate.toFixed(2)}deg)`;
+  lastInteraction = Date.now();
+
+  if (pupils.length) {
+    const maxOff = 5;
+    const ox = Math.max(-maxOff, Math.min(maxOff, dx * 0.05));
+    const oy = Math.max(-maxOff, Math.min(maxOff, dy * 0.05));
+    pupils.forEach(p2 => {
+      p2.style.transform = `translate(${ox}px, ${oy}px)`;
+    });
+  }
+}
+
+function handlePointerUp(e) {
+  if (!isDragging) return;
+  isDragging = false;
+
+  if (!hasMoved) {
+    handleClick();
+  } else {
+    petWrapper.classList.add('snapping');
+    petWrapper.style.transform = '';
+    setTimeout(() => {
+      petWrapper.classList.remove('snapping');
+      petWrapper.style.animation = '';
+    }, 600);
+    if (pupils.length) {
+      pupils.forEach(p2 => p2.style.transform = '');
+    }
+  }
+
+  dragStart = null;
+  hasMoved = false;
+}
+
+function handleClick() {
+  lastInteraction = Date.now();
+  stageEl.classList.add('played');
+  petWrapper.classList.add('react-click');
+  setTimeout(() => petWrapper.classList.remove('react-click'), 450);
+  spawnParticles(['💖', '✨', '⭐', '💫'], 5);
+  playSound('click');
+  setTemporaryEmotion('happy', 1500);
+}
+
+petWrapper.addEventListener('mousedown', handlePointerDown);
+petWrapper.addEventListener('touchstart', handlePointerDown, { passive: true });
+document.addEventListener('mousemove', handlePointerMove);
+document.addEventListener('touchmove', handlePointerMove, { passive: false });
+document.addEventListener('mouseup', handlePointerUp);
+document.addEventListener('touchend', handlePointerUp);
+
+/* =========================================================
+   СЛЕЖЕНИЕ ЗА КУРСОРОМ
+========================================================= */
+document.addEventListener('mousemove', e => {
+  if (isDragging) return;
+  const rect = petWrapper.getBoundingClientRect();
+  if (!rect.width) return;
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = (e.clientX - cx) / rect.width;
+  const dy = (e.clientY - cy) / rect.height;
+  const maxOff = 4;
+  const ox = Math.max(-maxOff, Math.min(maxOff, dx * maxOff * 1.6));
+  const oy = Math.max(-maxOff, Math.min(maxOff, dy * maxOff * 1.6));
+  pupils.forEach(p => {
+    p.style.transform = `translate(${ox}px, ${oy}px)`;
+  });
+});
+
+/* =========================================================
+   ТАЙМЕР
+========================================================= */
+function switchMode(mode) {
+  if (timer.running) return;
+  timer.mode = mode;
+  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+  if (mode === 'focus')       timer.duration = state.focusDuration;
+  else if (mode === 'short')  timer.duration = state.shortBreak;
+  else                        timer.duration = state.longBreak;
+
+  timer.remaining = timer.duration;
+  updateClockUI();
+  updateStartBtn();
+}
+
+function updateClockUI() {
+  clockEl.textContent = formatClock(timer.remaining);
+  clockEl.classList.toggle('warning', timer.remaining <= 60 && timer.running);
+  clockEl.classList.toggle('blink', timer.remaining <= 10 && timer.running);
+  updatePipUI();
+}
+
+function updateStartBtn() {
+  if (timer.running) {
+    startBtn.textContent = 'Пауза';
+    startBtn.classList.add('running');
+    timerStateEl.textContent = timer.mode === 'focus' ? 'Фокусируемся…' : 'Отдыхаем…';
+    timerStateEl.classList.add('active');
+  } else {
+    const hasProgress = timer.remaining < timer.duration;
+    startBtn.textContent = hasProgress ? 'Продолжить'
+      : (timer.mode === 'focus' ? 'Начать фокус'
+      : timer.mode === 'short' ? 'Начать перерыв' : 'Начать отдых');
+    startBtn.classList.remove('running');
+    timerStateEl.textContent = timer.mode === 'focus' ? 'Готов начать' : 'Пора отдохнуть';
+    timerStateEl.classList.remove('active');
+  }
+  updatePipUI();
+}
+
+function startTimer() {
+  lastInteraction = Date.now();
+
+  if (timer.running) {
+    timer.running = false;
+    timer.endAt = null;
+    updateStartBtn();
+    updateClockUI();
+    return;
+  }
+
+  timer.running = true;
+  timer.endAt = Date.now() + timer.remaining * 1000;
+  updateStartBtn();
+
+  if (timer.mode === 'focus') {
+    applyMood('focused');
+    petWrapper.classList.add('react-stretch');
+    setTimeout(() => petWrapper.classList.remove('react-stretch'), 700);
+  }
+
+  playSound('start');
+  tick();
+}
+
+function resetTimer() {
+  timer.running = false;
+  timer.endAt = null;
+  timer.remaining = timer.duration;
+  updateClockUI();
+  updateStartBtn();
+  applyMood(tempEmotion || computeMood());
+}
+
+function tick() {
+  if (!timer.running) return;
+  const now = Date.now();
+  const remaining = Math.max(0, Math.ceil((timer.endAt - now) / 1000));
+  timer.remaining = remaining;
+  updateClockUI();
+
+  if (remaining <= 0) { completeSession(); return; }
+  setTimeout(tick, 250);
+}
+
+function completeSession() {
+  timer.running = false;
+  timer.endAt = null;
+
+  if (timer.mode === 'focus') {
+    const minutesFocused = Math.round(timer.duration / 60);
+    state.xp += minutesFocused;
+    state.totalFocusSeconds += timer.duration;
+    state.sessions += 1;
+
+    const key = todayKey();
+    state.daily[key] = (state.daily[key] || 0) + timer.duration;
+
+    const yest = yesterdayKey();
+    if (state.lastFocusDate === key) { /* same day */ }
+    else if (state.lastFocusDate === yest) state.streak += 1;
+    else state.streak = 1;
+    state.lastFocusDate = key;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+
+    saveState();
+    celebrate();
+    checkAchievements();
+
+    timerStateEl.textContent = `Сессия завершена! +${minutesFocused} XP`;
+    setTimeout(() => switchMode(state.sessions % 4 === 0 ? 'long' : 'short'), 1200);
+  } else {
+    timerStateEl.textContent = 'Отдых окончен!';
+    playSound('breakEnd');
+    setTimeout(() => switchMode('focus'), 1200);
+  }
+
+  updateClockUI();
+  updateStartBtn();
+  render();
+}
+
+function celebrate() {
+  playSound('complete');
+  petWrapper.classList.add('react-jump');
+  setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  spawnParticles(['💖', '✨', '⭐', '💫', '🌟'], 12);
+  setTemporaryEmotion('happy', 3000);
+}
+
+/* =========================================================
+   ЧАСТИЦЫ
+========================================================= */
+function spawnParticles(symbols, count) {
+  const rect = stageEl.getBoundingClientRect();
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    p.style.left = (rect.width / 2 + (Math.random() - 0.5) * 120) + 'px';
+    p.style.top = (rect.height * 0.55 + (Math.random() - 0.5) * 40) + 'px';
+    p.style.setProperty('--dx', ((Math.random() - 0.5) * 130) + 'px');
+    p.style.animationDelay = (Math.random() * 0.25) + 's';
+    stageEl.appendChild(p);
+    setTimeout(() => p.remove(), 2400);
+  }
+}
+
+/* =========================================================
+   ЗВУКИ ИНТЕРФЕЙСА
+========================================================= */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch { return null; }
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function tone(freq, startOffset, duration, type = 'sine', volume = 0.22) {
+  const ctx = getAudioCtx();
+  if (!ctx || !state.soundOn) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startOffset;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+
+function playSound(type) {
+  if (!state.soundOn) return;
+  if (type === 'start') {
+    tone(660, 0, 0.15, 'sine', 0.15);
+    tone(880, 0.08, 0.2, 'sine', 0.12);
+  } else if (type === 'click') {
+    tone(880, 0, 0.08, 'sine', 0.13);
+    tone(1320, 0.04, 0.12, 'sine', 0.1);
+  } else if (type === 'complete') {
+    tone(523.25, 0, 0.35, 'sine', 0.2);
+    tone(659.25, 0.12, 0.35, 'sine', 0.2);
+    tone(783.99, 0.24, 0.5, 'sine', 0.22);
+    tone(1046.5, 0.38, 0.7, 'sine', 0.18);
+  } else if (type === 'breakEnd') {
+    tone(880, 0, 0.15, 'triangle', 0.15);
+    tone(880, 0.2, 0.15, 'triangle', 0.15);
+    tone(1174.66, 0.4, 0.35, 'triangle', 0.18);
+  } else if (type === 'ach') {
+    tone(587.33, 0, 0.2, 'sine', 0.18);
+    tone(880, 0.08, 0.25, 'sine', 0.16);
+    tone(1174.66, 0.18, 0.4, 'sine', 0.14);
+  }
+}
+
+/* =========================================================
+   LOFI MUSIC ENGINE — процедурный генератор
+========================================================= */
+const LofiEngine = {
+  ctx: null,
+  master: null,
+  filter: null,
+  vinylNode: null,
+  playing: false,
+  schedId: null,
+  nextNoteTime: 0,
+  step: 0,          // 16th step within 4-bar loop
+  bpm: 80,
+  keyRoot: 57,      // MIDI root (A3)
+  progression: [0, 5, 3, 4],
+  style: 'jazzy',
+  trackStart: 0,
+  trackDuration: 100,
+  recentStyles: [],
+
+  STYLES: ['jazzy', 'dreamy', 'mellow', 'nostalgic', 'rainy', 'cosmic'],
+
+  init() {
+    if (this.ctx) return true;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch { return false; }
+    this.filter = this.ctx.createBiquadFilter();
+    this.filter.type = 'lowpass';
+    this.filter.frequency.value = 4500;
+    this.filter.Q.value = 0.5;
+    this.filter.connect(this.ctx.destination);
+
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(this.filter);
+    return true;
+  },
+
+  start() {
+    if (!this.init()) return false;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.playing = true;
+    const vol = (state.musicVolume / 100) * 0.5;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 1.5);
+    this.startVinyl();
+    this.newTrack();
+    this.nextNoteTime = this.ctx.currentTime + 0.1;
+    this.step = 0;
+    this.schedId = setInterval(() => this.tick(), 25);
+    return true;
+  },
+
+  stop() {
+    this.playing = false;
+    if (this.schedId) clearInterval(this.schedId);
+    this.schedId = null;
+    if (this.master && this.ctx) {
+      this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.master.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+    }
+    setTimeout(() => { if (!this.playing) this.stopVinyl(); }, 800);
+  },
+
+  setVolume(v) {
+    if (!this.master || !this.playing) return;
+    const vol = (v / 100) * 0.5;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 0.3);
+  },
+
+  newTrack() {
+    // Choose a style not used recently
+    const available = this.STYLES.filter(s => !this.recentStyles.includes(s));
+    this.style = (available.length ? available : this.STYLES)[Math.floor(Math.random() * (available.length || this.STYLES.length))];
+    this.recentStyles.push(this.style);
+    if (this.recentStyles.length > 3) this.recentStyles.shift();
+
+    this.bpm = 68 + Math.floor(Math.random() * 22);
+    this.keyRoot = 45 + Math.floor(Math.random() * 12);
+
+    const progs = [
+      [0, 5, 3, 4], [0, 3, 4, 3], [0, 5, 2, 4],
+      [0, 4, 5, 3], [5, 3, 0, 4], [0, 6, 3, 4],
+      [0, 2, 5, 4], [0, 3, 5, 4], [0, 5, 6, 4]
+    ];
+    this.progression = progs[Math.floor(Math.random() * progs.length)];
+
+    if (this.ctx) {
+      this.trackStart = this.ctx.currentTime;
+    }
+    this.trackDuration = 100 + Math.random() * 80;
+
+    // Smooth filter shift per style
+    if (this.filter) {
+      const cutoffs = { jazzy: 3800, dreamy: 3200, mellow: 4200, nostalgic: 3500, rainy: 3000, cosmic: 4800 };
+      this.filter.frequency.cancelScheduledValues(this.ctx.currentTime);
+      this.filter.frequency.setTargetAtTime(cutoffs[this.style] || 4000, this.ctx.currentTime, 0.8);
+    }
+
+    // Notify in UI
+    updateMusicLabel();
+  },
+
+  secondsPerBeat() { return 60 / this.bpm; },
+  secondsPer16th() { return 60 / this.bpm / 4; },
+
+  tick() {
+    if (!this.playing || !this.ctx) return;
+    // Track change
+    if (this.ctx.currentTime - this.trackStart > this.trackDuration) {
+      this.newTrack();
+    }
+    const horizon = this.ctx.currentTime + 0.18;
+    while (this.nextNoteTime < horizon) {
+      this.scheduleStep(this.step, this.nextNoteTime);
+      this.nextNoteTime += this.secondsPer16th();
+      this.step = (this.step + 1) % 64;
+    }
+  },
+
+  SCALE: [0, 2, 3, 5, 7, 8, 10],
+
+  scheduleStep(step, time) {
+    const bar = Math.floor(step / 16) % 4;
+    const inBar = step % 16;
+    const degree = this.progression[bar];
+
+    if (inBar === 0) {
+      this.playChord(degree, time);
+      this.playBass(degree, time);
+      this.playBass(degree, time + this.secondsPerBeat() * 2);
+    }
+
+    // Kick pattern
+    if (inBar === 0 || inBar === 6 || inBar === 10) this.playKick(time);
+    // Snare
+    if (inBar === 4 || inBar === 12) this.playSnare(time);
+    // Hat
+    if (inBar % 2 === 0 && Math.random() < 0.72) {
+      this.playHat(time, inBar % 4 === 0 ? 0.055 : 0.03);
+    }
+    // Melody (sparse)
+    if (inBar === 0 && Math.random() < 0.35) this.playMelodyNote(time + 0.05);
+    if (inBar === 8 && Math.random() < 0.45) this.playMelodyNote(time);
+    if (inBar === 6 && Math.random() < 0.15) this.playMelodyNote(time + 0.02);
+  },
+
+  playChord(degree, time) {
+    const rootMidi = this.keyRoot + 12;
+    const notes = [0, 2, 4].map(o => {
+      const idx = degree + o;
+      const oct = Math.floor(idx / 7);
+      return rootMidi + this.SCALE[idx % 7] + oct * 12;
+    });
+
+    const dur = this.secondsPerBeat() * 3.5;
+
+    notes.forEach(midi => {
+      const freq = 440 * Math.pow(2, (midi - 69) / 12);
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const lp = this.ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.detune.value = (Math.random() - 0.5) * 8;
+
+      lp.type = 'lowpass';
+      lp.frequency.value = 1100 + Math.random() * 500;
+      lp.Q.value = 0.7;
+
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.055, time + 0.4);
+      gain.gain.setValueAtTime(0.055, time + dur - 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+      osc.connect(lp).connect(gain).connect(this.master);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    });
+  },
+
+  playBass(degree, time) {
+    const midi = this.keyRoot + this.SCALE[degree % 7] + Math.floor(degree / 7) * 12;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const lp = this.ctx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    lp.type = 'lowpass';
+    lp.frequency.value = 400;
+
+    const dur = this.secondsPerBeat() * 1.5;
+
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.22, time + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+    osc.connect(lp).connect(gain).connect(this.master);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+  },
+
+  playKick(time) {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.32, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.28);
+    osc.connect(gain).connect(this.master);
+    osc.start(time);
+    osc.stop(time + 0.32);
+  },
+
+  playSnare(time) {
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.15);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    bp.Q.value = 0.8;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.11;
+    src.connect(bp).connect(gain).connect(this.master);
+    src.start(time);
+  },
+
+  playHat(time, vol) {
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.05);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 6500;
+    const gain = this.ctx.createGain();
+    gain.gain.value = vol || 0.04;
+    src.connect(hp).connect(gain).connect(this.master);
+    src.start(time);
+  },
+
+  playMelodyNote(time) {
+    const octave = Math.floor(Math.random() * 2) * 12;
+    const degree = Math.floor(Math.random() * 7);
+    const midi = this.keyRoot + 24 + this.SCALE[degree] + octave;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const lp = this.ctx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    lp.type = 'lowpass';
+    lp.frequency.value = 2500;
+
+    const dur = 0.5 + Math.random() * 0.8;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.045, time + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+    osc.connect(lp).connect(gain).connect(this.master);
+    osc.start(time);
+    osc.stop(time + dur + 0.1);
+  },
+
+  startVinyl() {
+    if (this.vinylNode || !this.ctx) return;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 3);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      const r = Math.random();
+      if (r < 0.003) data[i] = (Math.random() * 2 - 1) * 0.5;
+      else data[i] = (Math.random() * 2 - 1) * 0.008;
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 1800;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.22;
+    src.connect(hp).connect(gain).connect(this.master);
+    src.start();
+    this.vinylNode = src;
+  },
+
+  stopVinyl() {
+    if (this.vinylNode) {
+      try { this.vinylNode.stop(); } catch {}
+      this.vinylNode = null;
+    }
+  }
+};
+
+/* ---------- lofi button ---------- */
+function toggleMusic() {
+  if (LofiEngine.playing) {
+    LofiEngine.stop();
+    musicBtn.classList.remove('active', 'pulse');
+  } else {
+    const ok = LofiEngine.start();
+    if (!ok) {
+      alert('Не удалось запустить аудио.');
+      return;
+    }
+    musicBtn.classList.add('active', 'pulse');
+  }
+  saveState();
+}
+
+function updateMusicLabel() {
+  // показать название стиля через title
+  const styleNames = {
+    jazzy: 'Jazzy', dreamy: 'Dreamy', mellow: 'Mellow',
+    nostalgic: 'Nostalgic', rainy: 'Rainy', cosmic: 'Cosmic'
+  };
+  musicBtn.title = LofiEngine.playing
+    ? `Lofi: ${styleNames[LofiEngine.style] || LofiEngine.style} · ${LofiEngine.bpm} BPM`
+    : 'Lofi музыка (вкл.)';
+}
+
+/* =========================================================
+   PICTURE-IN-PICTURE MINI TIMER
+========================================================= */
+let pipWindow = null;
+let pipPlayBtn = null;
+
+async function togglePip() {
+  if (!('documentPictureInPicture' in window)) {
+    alert('Картинка-в-картинке не поддерживается этим браузером.\nИспользуйте Chrome 116+ или Edge 116+.\nВ этом окне таймер всё равно остаётся поверх других приложений.');
+    return;
+  }
+
+  if (pipWindow) {
+    try { pipWindow.close(); } catch {}
+    pipWindow = null;
+    pipBtn.classList.remove('active');
+    return;
+  }
+
+  try {
+    pipWindow = await documentPictureInPicture.requestWindow({
+      width: 320,
+      height: 200
+    });
+  } catch (e) {
+    return;
+  }
+
+  // --- styles ---
+  const styleEl = pipWindow.document.createElement('style');
+  styleEl.textContent = getPipStyles();
+  pipWindow.document.head.appendChild(styleEl);
+
+  // --- content ---
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  pipWindow.document.body.innerHTML = `
+    <div class="pip-timer">
+      <div class="pip-top">
+        <span class="pip-pet">${ch.emoji}</span>
+        <span class="pip-mode" id="pipMode">Фокус</span>
+      </div>
+      <div class="pip-clock" id="pipClock">25:00</div>
+      <div class="pip-state" id="pipState">Готов начать</div>
+      <div class="pip-actions">
+        <button class="pip-btn pip-primary" id="pipPlay">Старт</button>
+        <button class="pip-btn pip-secondary" id="pipReset" title="Сброс">↺</button>
+      </div>
+    </div>
+  `;
+
+  pipWindow.document.getElementById('pipPlay').addEventListener('click', () => {
+    startTimer();
+    updatePipUI();
+  });
+  pipWindow.document.getElementById('pipReset').addEventListener('click', () => {
+    resetTimer();
+    updatePipUI();
+  });
+
+  pipWindow.addEventListener('pagehide', () => {
+    pipWindow = null;
+    pipPlayBtn = null;
+    pipBtn.classList.remove('active');
+  });
+
+  updatePipTheme();
+  updatePipUI();
+
+  pipBtn.classList.add('active');
+}
+
+function getPipStyles() {
+  return `
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background:
+        radial-gradient(circle at 25% 15%, rgba(var(--pet-glow), 0.22), transparent 60%),
+        linear-gradient(160deg, var(--bg-1), #050507);
+      color: #fff;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    .pip-timer {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pip-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+    }
+    .pip-pet { font-size: 16px; }
+    .pip-mode { color: var(--pet-1); }
+    .pip-clock {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.6) 140%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .pip-clock.warning {
+      background: linear-gradient(180deg, #ffb066 0%, #ff6b6b 140%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    .pip-state {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      font-weight: 600;
+    }
+    .pip-state.active { color: var(--pet-1); }
+    .pip-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .pip-btn {
+      border: none;
+      font-family: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      border-radius: 12px;
+      transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pip-btn:active { transform: scale(0.96); }
+    .pip-primary {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 13px;
+      background: linear-gradient(135deg, var(--pet-1), var(--pet-2));
+      color: #0a0a12;
+      box-shadow: 0 8px 22px rgba(var(--pet-glow), 0.28);
+    }
+    .pip-primary:hover { filter: brightness(1.06); }
+    .pip-primary.running {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      box-shadow: none;
+    }
+    .pip-secondary {
+      width: 44px;
+      font-size: 18px;
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.65);
+    }
+    .pip-secondary:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  `;
+}
+
+function updatePipTheme() {
+  if (!pipWindow) return;
+  const root = pipWindow.document.documentElement;
+  const cs = getComputedStyle(document.documentElement);
+  root.style.setProperty('--pet-1', cs.getPropertyValue('--pet-1'));
+  root.style.setProperty('--pet-2', cs.getPropertyValue('--pet-2'));
+  root.style.setProperty('--pet-glow', cs.getPropertyValue('--pet-glow'));
+  root.style.setProperty('--bg-1', cs.getPropertyValue('--bg-1'));
+  // update pet emoji too
+  const petEl = pipWindow.document.querySelector('.pip-pet');
+  if (petEl) petEl.textContent = (CHARACTERS[state.character] || CHARACTERS.pip).emoji;
+}
+
+function updatePipUI() {
+  if (!pipWindow) return;
+  const clock = pipWindow.document.getElementById('pipClock');
+  const stateEl = pipWindow.document.getElementById('pipState');
+  const modeEl = pipWindow.document.getElementById('pipMode');
+  const playBtn = pipWindow.document.getElementById('pipPlay');
+  if (!clock || !stateEl || !modeEl || !playBtn) return;
+
+  clock.textContent = formatClock(timer.remaining);
+  clock.classList.toggle('warning', timer.remaining <= 60 && timer.running);
+
+  const modeNames = { focus: 'Фокус', short: 'Перерыв', long: 'Отдых' };
+  modeEl.textContent = modeNames[timer.mode] || 'Фокус';
+
+  if (timer.running) {
+    stateEl.textContent = timer.mode === 'focus' ? 'Фокусируемся…' : 'Отдыхаем…';
+    stateEl.classList.add('active');
+    playBtn.textContent = 'Пауза';
+    playBtn.classList.add('running');
+  } else {
+    stateEl.textContent = timer.mode === 'focus' ? 'Готов начать' : 'Пора отдохнуть';
+    stateEl.classList.remove('active');
+    const hasProgress = timer.remaining < timer.duration;
+    playBtn.textContent = hasProgress ? 'Продолжить'
+      : (timer.mode === 'focus' ? 'Старт' : 'Старт');
+    playBtn.classList.remove('running');
+  }
+}
+
+/* =========================================================
+   ДОСТИЖЕНИЯ
+========================================================= */
+function checkAchievements() {
+  const unlocked = state.achievements || [];
+  const newlyUnlocked = [];
+
+  ACHIEVEMENTS.forEach(a => {
+    if (!unlocked.includes(a.id) && a.check(state)) {
+      unlocked.push(a.id);
+      newlyUnlocked.push(a);
+    }
+  });
+
+  if (newlyUnlocked.length) {
+    state.achievements = unlocked;
+    saveState();
+    newlyUnlocked.forEach((a, i) => {
+      setTimeout(() => showAchievementToast(a), i * 900);
+    });
+    updateAchCount();
+    renderAchGrid();
+  }
+  return newlyUnlocked;
+}
+
+function showAchievementToast(a) {
+  playSound('ach');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <div class="t-icon">${a.icon}</div>
+    <div class="t-body">
+      <div class="t-label">Новое достижение</div>
+      <div class="t-name">${a.name}</div>
+      <div class="t-desc">${a.desc}</div>
+    </div>
+  `;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('leaving');
+    setTimeout(() => toast.remove(), 500);
+  }, 4200);
+}
+
+function renderAchGrid() {
+  if (!achGrid) return;
+  const unlocked = state.achievements || [];
+  achGrid.innerHTML = ACHIEVEMENTS.map(a => {
+    const isUnlocked = unlocked.includes(a.id);
+    return `
+      <div class="ach-card ${isUnlocked ? 'unlocked' : 'locked'}">
+        <div class="ach-icon">${isUnlocked ? a.icon : '🔒'}</div>
+        <div class="ach-info">
+          <div class="ach-name">${a.name}</div>
+          <div class="ach-desc">${a.desc}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateAchCount();
+}
+
+function updateAchCount() {
+  if (!achCount) return;
+  const unlocked = (state.achievements || []).length;
+  achCount.textContent = `${unlocked} / ${ACHIEVEMENTS.length}`;
+}
+
+function openAchModal() {
+  renderAchGrid();
+  achModal.classList.add('open');
+}
+function closeAchModal() {
+  achModal.classList.remove('open');
+}
+
+/* =========================================================
+   СОБЫТИЯ
+========================================================= */
+startBtn.addEventListener('click', startTimer);
+resetBtn.addEventListener('click', resetTimer);
+
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (timer.running) {
+      timer.running = false;
+      timer.endAt = null;
+    }
+    switchMode(btn.dataset.mode);
+  });
+});
+
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.classList.toggle('open');
+});
+
+soundBtn.addEventListener('click', () => {
+  state.soundOn = !state.soundOn;
+  soundBtn.classList.toggle('muted', !state.soundOn);
+  saveState();
+});
+
+musicBtn.addEventListener('click', toggleMusic);
+pipBtn.addEventListener('click', togglePip);
+achBtn.addEventListener('click', openAchModal);
+achClose.addEventListener('click', closeAchModal);
+
+achModal.addEventListener('click', (e) => {
+  if (e.target === achModal) closeAchModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && achModal.classList.contains('open')) {
+    closeAchModal();
+  }
+});
+
+nameInput.addEventListener('input', e => {
+  state.petName = e.target.value.trim() || CHARACTERS[state.character].name;
+  petNameEl.textContent = state.petName;
+  saveState();
+});
+
+focusInput.addEventListener('change', e => {
+  const min = Math.max(1, Math.min(180, parseInt(e.target.value) || 25));
+  state.focusDuration = min * 60;
+  saveState();
+  if (timer.mode === 'focus' && !timer.running && timer.remaining === timer.duration) {
+    switchMode('focus');
+  }
+});
+
+goalInput.addEventListener('change', e => {
+  const min = Math.max(10, Math.min(600, parseInt(e.target.value) || 60));
+  state.goalMin = min;
+  saveState();
+  render();
+});
+
+musicVolInput.addEventListener('input', e => {
+  state.musicVolume = parseInt(e.target.value) || 45;
+  LofiEngine.setVolume(state.musicVolume);
+  saveState();
+});
+
+resetAllBtn.addEventListener('click', () => {
+  if (!confirm('Точно сбросить весь прогресс? Питомец начнёт с нуля 🥺')) return;
+  const ch = state.character;
+  const keepVolume = state.musicVolume;
+  state = { ...defaultState, character: ch, musicVolume: keepVolume };
+  state.petName = CHARACTERS[ch].name;
+  saveState();
+  switchMode('focus');
+  renderPet();
+  render();
+  buildCharPicker();
+  renderAchGrid();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); startTimer(); }
+  if (e.code === 'KeyR') { e.preventDefault(); resetTimer(); }
+});
+
+window.addEventListener('beforeunload', () => saveState());
+setInterval(() => render(), 60000);
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ
+========================================================= */
+function init() {
+  if (!state.petName) state.petName = CHARACTERS[state.character].name;
+  if (!Array.isArray(state.achievements)) state.achievements = [];
+
+  applyStageColors();
+  soundBtn.classList.toggle('muted', !state.soundOn);
+  musicVolInput.value = state.musicVolume ?? 45;
+
+  buildCharPicker();
+  renderPet();
+
+  switchMode('focus');
+  timer.duration = state.focusDuration;
+  timer.remaining = timer.duration;
+  updateClockUI();
+  updateStartBtn();
+  render();
+  renderAchGrid();
+
+  startBlinking();
+  startIdleBehavior();
+
+  // Проверим ачивки на старте (могли уже выполниться раньше)
+  setTimeout(() => checkAchievements(), 1500);
+
+  // Приветствие
+  setTimeout(() => {
+    petWrapper.classList.add('react-jump');
+    spawnParticles(['✨', '💫'], 3);
+    setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  }, 500);
+}
+
+init();
+</script>
+</body>
+</html>
