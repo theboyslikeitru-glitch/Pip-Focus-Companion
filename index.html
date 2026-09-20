@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pip — Focus Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --pet-1: #a3f0e0; --pet-2: #5fd4c0; --pet-glow: 163, 240, 224;
+    --accent: var(--pet-1);
+    --bg-1: #0e0e17; --bg-2: #050507;
+    --fg: #ffffff; --fg-dim: rgba(255,255,255,0.55); --fg-mute: rgba(255,255,255,0.35);
+    --surface: rgba(255,255,255,0.055); --surface-hover: rgba(255,255,255,0.11);
+  }
+  html, body { height: 100%; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 20% 10%, rgba(var(--pet-glow), 0.14) 0%, transparent 50%),
+      radial-gradient(circle at 85% 90%, rgba(var(--pet-glow), 0.08) 0%, transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--fg); display: flex; align-items: center; justify-content: center;
+    padding: 32px 24px; overflow-x: hidden; -webkit-font-smoothing: antialiased;
+    transition: background 0.8s ease;
+  }
+  .app { width: 100%; max-width: 1080px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: 20px; align-items: center; }
+
+  /* TOPBAR */
+  .topbar { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 6px; flex-wrap: wrap; gap: 12px; }
+  .pet-name-badge { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+  .pet-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: dotPulse 2s ease-in-out infinite; }
+  @keyframes dotPulse { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:0.55; transform:scale(0.8);} }
+  .level-badge { padding: 3px 9px; border-radius: 999px; background: var(--surface); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-dim); font-weight: 600; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .char-picker { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); }
+  .char-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; font-size: 16px; cursor: pointer; display: grid; place-items: center; transition: background 0.2s ease, transform 0.15s ease; -webkit-tap-highlight-color: transparent; filter: grayscale(0.4) opacity(0.6); }
+  .char-btn:hover { filter: grayscale(0) opacity(1); transform: scale(1.1); background: rgba(255,255,255,0.06); }
+  .char-btn.active { background: rgba(var(--pet-glow), 0.18); filter: grayscale(0) opacity(1); box-shadow: 0 0 12px rgba(var(--pet-glow), 0.4); }
+  .streak { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--fg-dim); padding: 7px 14px; border-radius: 999px; background: var(--surface); transition: background 0.3s ease; }
+  .streak.hot { background: rgba(255,140,60,0.15); color: #ffb066; }
+  .streak.hot .flame { animation: flame 1.4s ease-in-out infinite; }
+  @keyframes flame { 0%,100%{transform:scale(1) rotate(-3deg);} 50%{transform:scale(1.15) rotate(3deg);} }
+
+  /* STAGE */
+  .stage { position: relative; aspect-ratio: 1/1; max-width: 480px; width: 100%; justify-self: center; display: flex; align-items: center; justify-content: center; border-radius: 32px; background: radial-gradient(circle at 50% 40%, rgba(var(--pet-glow), 0.1), transparent 65%); overflow: hidden; }
+  .stage::before { content:''; position:absolute; bottom:12%; left:50%; transform:translateX(-50%); width:60%; height:8%; background:radial-gradient(ellipse, rgba(var(--pet-glow),0.5), transparent 70%); filter:blur(20px); opacity:0.7; transition:opacity 0.5s ease; }
+  .stage.focused::before { opacity:1; animation: groundGlow 2.4s ease-in-out infinite; }
+  @keyframes groundGlow { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.15);} }
+  .pet-wrapper { position:relative; width:78%; aspect-ratio:1/1; display:flex; align-items:flex-end; justify-content:center; will-change:transform; animation:idleBounce 3.2s ease-in-out infinite; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; transform-origin:center bottom; }
+  .pet-wrapper:active { cursor:grabbing; }
+  @keyframes idleBounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+  .pet-wrapper.focused { animation:focusBounce 1.6s ease-in-out infinite; }
+  @keyframes focusBounce { 0%,100%{transform:translateY(0) scale(1,1);} 50%{transform:translateY(-10px) scale(0.97,1.04);} }
+  .pet-wrapper.sleepy { animation:sleepyBreath 5s ease-in-out infinite; }
+  @keyframes sleepyBreath { 0%,100%{transform:translateY(0) scale(1,1);} 50%{transform:translateY(2px) scale(1.02,0.98);} }
+  .pet-wrapper.sad { animation:sadBounce 4s ease-in-out infinite; }
+  @keyframes sadBounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(3px);} }
+  .pet-wrapper.snapping { transition: transform 0.55s cubic-bezier(.34,1.56,.64,1); }
+  .pet-wrapper.react-jump { animation:reactJump 0.9s cubic-bezier(.3,1.4,.5,1) !important; }
+  @keyframes reactJump { 0%{transform:translateY(0) scale(1,1);} 30%{transform:translateY(-50px) scale(0.9,1.15);} 60%{transform:translateY(0) scale(1.15,0.85);} 80%{transform:translateY(-14px) scale(0.97,1.05);} 100%{transform:translateY(0) scale(1,1);} }
+  .pet-wrapper.react-click { animation:reactClick 0.45s cubic-bezier(.3,1.4,.5,1) !important; }
+  @keyframes reactClick { 0%{transform:scale(1,1);} 30%{transform:scale(1.18,0.86);} 60%{transform:scale(0.94,1.08);} 100%{transform:scale(1,1);} }
+  .pet-wrapper.react-stretch { animation:reactStretch 0.7s ease-out !important; }
+  @keyframes reactStretch { 0%{transform:scale(1,1);} 40%{transform:scale(0.92,1.12);} 100%{transform:scale(1,1);} }
+  .pet-svg { width:100%; height:100%; overflow:visible; transition:filter 0.4s ease; pointer-events:none; }
+  .pet-body-path { transition: fill 0.6s ease; }
+  .eyes { opacity:0; transition:opacity 0.22s ease; } .eyes.visible { opacity:1; }
+  .pupil { transition: transform 0.1s ease-out; }
+  .mouth { opacity:0; transition:opacity 0.22s ease; } .mouth.visible { opacity:1; }
+  .blush { transition: opacity 0.5s ease; }
+  .zzz { position:absolute; top:8%; right:14%; font-size:22px; font-weight:800; color:var(--accent); opacity:0; letter-spacing:-0.1em; transition:opacity 0.4s ease; pointer-events:none; }
+  .stage.sleepy .zzz { opacity:0.85; animation: zzzFloat 3s ease-in-out infinite; }
+  @keyframes zzzFloat { 0%{transform:translate(0,0) scale(0.9); opacity:0.4;} 50%{transform:translate(6px,-12px) scale(1.1); opacity:0.9;} 100%{transform:translate(0,0) scale(0.9); opacity:0.4;} }
+  .particle { position:absolute; pointer-events:none; font-size:18px; user-select:none; animation:particleRise 1.8s ease-out forwards; z-index:2; }
+  @keyframes particleRise { 0%{transform:translate(0,0) scale(0.4); opacity:0;} 15%{opacity:1;} 100%{transform:translate(var(--dx,0px), -100px) scale(1.1); opacity:0;} }
+  .drag-hint { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-mute); pointer-events:none; transition:opacity 0.5s ease; opacity:0.5; }
+  .stage.played .drag-hint { opacity:0; }
+
+  /* TIMER */
+  .timer-card { display:flex; flex-direction:column; gap:22px; padding:36px 34px; border-radius:32px; background:linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.06); backdrop-filter:blur(12px); box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+  .modes { display:flex; gap:6px; padding:5px; background:rgba(255,255,255,0.04); border-radius:999px; align-self:flex-start; }
+  .mode-btn { padding:9px 16px; border-radius:999px; border:none; background:transparent; color:var(--fg-dim); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; transition:color 0.2s ease, background 0.25s ease; -webkit-tap-highlight-color:transparent; }
+  .mode-btn:hover { color: var(--fg); }
+  .mode-btn.active { background: rgba(255,255,255,0.1); color: var(--fg); }
+  .clock { font-size:clamp(56px, 9vw, 88px); font-weight:800; letter-spacing:-0.045em; line-height:1; font-variant-numeric:tabular-nums; background:linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.6) 140%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .clock.warning { background:linear-gradient(180deg, #ffb066 0%, #ff6b6b 140%); -webkit-background-clip:text; background-clip:text; }
+  .clock.blink { animation: clockBlink 1s ease-in-out infinite; }
+  @keyframes clockBlink { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  .timer-state { font-size:12px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-mute); margin-top:-14px; transition:color 0.3s ease; }
+  .timer-state.active { color: var(--accent); }
+  .timer-controls { display:flex; gap:10px; align-items:center; }
+  .btn-primary { flex:1; padding:16px 22px; border-radius:18px; border:none; background:linear-gradient(135deg, var(--pet-1), var(--pet-2)); color:#0a0a12; font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; transition:transform 0.15s ease, box-shadow 0.3s ease, filter 0.2s ease; box-shadow: 0 10px 30px rgba(var(--pet-glow), 0.25); -webkit-tap-highlight-color:transparent; }
+  .btn-primary:hover { transform:translateY(-2px); box-shadow: 0 14px 38px rgba(var(--pet-glow), 0.45); filter:brightness(1.05); }
+  .btn-primary:active { transform:translateY(0) scale(0.98); }
+  .btn-primary.running { background:rgba(255,255,255,0.09); color:var(--fg); box-shadow:none; }
+  .btn-primary.running:hover { background:rgba(255,255,255,0.14); }
+  .btn-ghost { width:54px; height:54px; border-radius:18px; border:none; background:rgba(255,255,255,0.05); color:var(--fg-dim); cursor:pointer; display:grid; place-items:center; transition:background 0.2s ease, color 0.2s ease, transform 0.15s ease; -webkit-tap-highlight-color:transparent; }
+  .btn-ghost svg { width:18px; height:18px; }
+  .btn-ghost:hover { background:rgba(255,255,255,0.1); color:var(--fg); transform:translateY(-2px); }
+  .btn-ghost:active { transform:translateY(0) scale(0.95); }
+  .goal { display:flex; flex-direction:column; gap:10px; }
+  .goal-head { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; font-weight:600; color:var(--fg-dim); }
+  .goal-head .num { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .goal-head .target { color: var(--fg-mute); }
+  .goal-bar { height:8px; border-radius:8px; background:rgba(255,255,255,0.06); overflow:hidden; }
+  .goal-fill { height:100%; width:0%; border-radius:8px; background:linear-gradient(90deg, var(--pet-1), var(--pet-2)); box-shadow: 0 0 14px rgba(var(--pet-glow), 0.6); transition: width 0.6s cubic-bezier(.3,.9,.4,1); }
+  .xp-block { display:flex; flex-direction:column; gap:10px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.06); }
+  .xp-head { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; font-weight:600; color:var(--fg-dim); }
+  .xp-head .stage-name { color: var(--fg); }
+  .xp-head .xp-num { font-variant-numeric: tabular-nums; }
+  .xp-bar { height:6px; border-radius:6px; background:rgba(255,255,255,0.06); overflow:hidden; }
+  .xp-fill { height:100%; width:0%; border-radius:6px; background:var(--accent); box-shadow: 0 0 12px rgba(var(--pet-glow), 0.6); transition: width 0.6s cubic-bezier(.3,.9,.4,1), background 0.6s ease; }
+
+  /* FOOTER */
+  .footer { grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; padding:4px; font-size:12px; color:var(--fg-mute); font-weight:500; }
+  .footer-stats { display:flex; gap:22px; flex-wrap:wrap; }
+  .stat b { color: var(--fg-dim); font-weight:600; margin-right:4px; }
+  .stat span { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .footer-actions { display:flex; gap:8px; }
+  .icon-btn { width:36px; height:36px; border-radius:50%; border:none; background:var(--surface); color:var(--fg-dim); cursor:pointer; display:grid; place-items:center; transition:background 0.2s ease, color 0.2s ease, box-shadow 0.3s ease; -webkit-tap-highlight-color:transparent; position:relative; }
+  .icon-btn svg { width:15px; height:15px; }
+  .icon-btn:hover { background:var(--surface-hover); color:var(--fg); }
+  .icon-btn.muted { color: var(--fg-mute); opacity: 0.5; }
+  .icon-btn.active { background:rgba(var(--pet-glow), 0.16); color: var(--pet-1); box-shadow: 0 0 12px rgba(var(--pet-glow), 0.35); }
+  .icon-btn.pulse::after { content:''; position:absolute; inset:-3px; border-radius:50%; border:1.5px solid var(--accent); animation: pulseRing 1.8s ease-out infinite; opacity:0; }
+  @keyframes pulseRing { 0%{transform:scale(0.9); opacity:0.7;} 100%{transform:scale(1.5); opacity:0;} }
+
+  /* LANGUAGE MENU */
+  .lang-wrap { position: relative; }
+  .lang-menu {
+    position: absolute; bottom: calc(100% + 10px); right: 0;
+    background: linear-gradient(180deg, rgba(30,30,45,0.98), rgba(15,15,25,0.99));
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+    padding: 6px; display: none; flex-direction: column; gap: 2px;
+    min-width: 170px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); z-index: 60;
+    backdrop-filter: blur(12px);
+  }
+  .lang-menu.open { display: flex; }
+  .lang-option {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 10px; border: none; background: transparent;
+    color: var(--fg-dim); font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; text-align: left; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .lang-option:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .lang-option.active { background: rgba(var(--pet-glow), 0.15); color: var(--pet-1); }
+  .lang-option .flag { font-size: 16px; }
+
+  /* SETTINGS */
+  .settings-panel { grid-column: 1 / -1; padding:22px 24px; border-radius:22px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); display:none; gap:20px; align-items:center; flex-wrap:wrap; font-size:13px; }
+  .settings-panel.open { display: flex; }
+  .setting { display:flex; align-items:center; gap:10px; color:var(--fg-dim); font-weight:600; }
+  .setting input[type="number"], .setting input[type="text"] { width:100px; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.04); color:var(--fg); font-family:inherit; font-size:13px; font-weight:600; outline:none; text-align:center; font-variant-numeric:tabular-nums; }
+  .setting input[type="number"] { width: 64px; }
+  .setting input:focus { border-color:var(--accent); box-shadow: 0 0 0 3px rgba(var(--pet-glow), 0.15); }
+  .setting input[type="range"] { -webkit-appearance:none; appearance:none; width:100px; height:4px; background:rgba(255,255,255,0.1); border-radius:4px; outline:none; }
+  .setting input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; box-shadow: 0 0 8px rgba(var(--pet-glow), 0.6); }
+  .setting input[type="range"]::-moz-range-thumb { width:14px; height:14px; border:none; border-radius:50%; background:var(--accent); cursor:pointer; }
+  .reset-btn { margin-left:auto; padding:9px 16px; border-radius:10px; border:1px solid rgba(255,100,100,0.25); background:rgba(255,100,100,0.06); color:#ff8080; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:background 0.2s ease; }
+  .reset-btn:hover { background: rgba(255,100,100,0.14); }
+
+  /* MODAL */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; animation: fadeIn 0.25s ease; }
+  .modal.open { display: flex; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .modal-content { width:100%; max-width:720px; max-height:85vh; display:flex; flex-direction:column; padding:26px 28px; border-radius:26px; background:linear-gradient(180deg, rgba(30,30,45,0.95), rgba(15,15,25,0.98)); border:1px solid rgba(var(--pet-glow), 0.2); box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(var(--pet-glow), 0.1); animation: modalIn 0.4s cubic-bezier(.3,1.3,.5,1); }
+  @keyframes modalIn { from { transform:scale(0.92) translateY(20px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
+  .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:12px; }
+  .modal-title { display:flex; align-items:baseline; gap:12px; }
+  .modal-title h2 { font-size:20px; font-weight:800; letter-spacing:-0.02em; }
+  .modal-count { font-size:12px; color:var(--fg-dim); font-weight:700; padding:4px 10px; background:var(--surface); border-radius:999px; font-variant-numeric:tabular-nums; }
+  .modal-close { width:34px; height:34px; border-radius:50%; border:none; background:var(--surface); color:var(--fg-dim); cursor:pointer; display:grid; place-items:center; font-size:20px; line-height:1; transition:background 0.2s ease, color 0.2s ease; }
+  .modal-close:hover { background: var(--surface-hover); color: var(--fg); }
+  .ach-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; overflow-y:auto; padding:4px 8px 4px 4px; margin:-4px; flex:1; }
+  .ach-grid::-webkit-scrollbar { width: 6px; }
+  .ach-grid::-webkit-scrollbar-track { background: transparent; }
+  .ach-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .ach-card { display:flex; gap:12px; padding:14px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); transition:all 0.3s ease; align-items:flex-start; }
+  .ach-card.locked { opacity: 0.45; }
+  .ach-card.unlocked { background:linear-gradient(135deg, rgba(var(--pet-glow), 0.12), rgba(255,255,255,0.02)); border-color:rgba(var(--pet-glow), 0.3); box-shadow: 0 0 20px rgba(var(--pet-glow), 0.08) inset; }
+  .ach-icon { font-size:26px; flex-shrink:0; line-height:1; filter: drop-shadow(0 0 8px rgba(var(--pet-glow), 0.3)); }
+  .ach-card.locked .ach-icon { filter: grayscale(1) brightness(0.6); }
+  .ach-info { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .ach-name { font-size:13px; font-weight:700; }
+  .ach-desc { font-size:11px; color:var(--fg-dim); line-height:1.35; }
+  .ach-card.unlocked .ach-desc { color: rgba(255,255,255,0.65); }
+
+  /* TOASTS */
+  .toast-container { position:fixed; top:20px; right:20px; display:flex; flex-direction:column; gap:10px; z-index:200; pointer-events:none; }
+  .toast { display:flex; align-items:center; gap:12px; padding:14px 18px 14px 14px; background:linear-gradient(135deg, rgba(30,30,45,0.95), rgba(20,20,35,0.98)); border:1px solid rgba(var(--pet-glow), 0.35); backdrop-filter:blur(20px); border-radius:16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 40px rgba(var(--pet-glow), 0.2); animation: toastIn 0.55s cubic-bezier(.3,1.4,.5,1); pointer-events:auto; min-width:280px; max-width:340px; }
+  .toast.leaving { animation: toastOut 0.4s ease forwards; }
+  .toast .t-icon { font-size:28px; filter: drop-shadow(0 0 10px rgba(var(--pet-glow), 0.5)); flex-shrink:0; }
+  .toast .t-body { min-width: 0; }
+  .toast .t-label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent); font-weight:800; margin-bottom:3px; }
+  .toast .t-name { font-size:14px; font-weight:700; margin-bottom:2px; }
+  .toast .t-desc { font-size:11px; color:var(--fg-dim); line-height:1.3; }
+  @keyframes toastIn { from { transform:translateX(400px) scale(0.9); opacity:0; } to { transform:translateX(0) scale(1); opacity:1; } }
+  @keyframes toastOut { to { transform:translateX(400px) scale(0.9); opacity:0; } }
+
+  @media (max-width: 840px) {
+    body { padding: 20px 18px; }
+    .app { grid-template-columns: 1fr; gap: 18px; padding-bottom: 40px; }
+    .stage { max-width: 340px; }
+    .timer-card { padding: 28px 24px; gap: 18px; }
+    .toast-container { left: 20px; right: 20px; }
+    .toast { min-width: 0; }
+  }
+  @media (max-width: 420px) {
+    .stage { max-width: 260px; }
+    .clock { font-size: 64px; }
+    .char-btn { width: 30px; height: 30px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<main class="app">
+
+  <div class="topbar">
+    <div class="pet-name-badge">
+      <div class="pet-dot"></div>
+      <span id="petName">Pip</span>
+      <span class="level-badge" id="levelBadge">Seed</span>
+    </div>
+    <div class="topbar-right">
+      <div class="char-picker" id="charPicker"></div>
+      <div class="streak" id="streakBadge">
+        <span class="flame">🔥</span>
+        <span id="streakText">0 days in a row</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="pet-wrapper" id="petWrapper">
+      <svg class="pet-svg" id="petSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="zzz">z z</div>
+    </div>
+    <div class="drag-hint" id="dragHint">Pet · Drag</div>
+  </div>
+
+  <div class="timer-card">
+    <div class="modes">
+      <button class="mode-btn active" data-mode="focus"></button>
+      <button class="mode-btn" data-mode="short"></button>
+      <button class="mode-btn" data-mode="long"></button>
+    </div>
+
+    <div class="clock" id="clock">25:00</div>
+    <div class="timer-state" id="timerState"></div>
+
+    <div class="timer-controls">
+      <button class="btn-primary" id="startBtn"></button>
+      <button class="btn-ghost" id="resetBtn" title="Reset" aria-label="Reset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 3-6.7"/>
+          <polyline points="3 3 3 9 9 9"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="goal">
+      <div class="goal-head">
+        <span id="todayLabel">Today</span>
+        <span><span class="num" id="todayMin">0</span> <span class="target">/ <span id="goalMin">60</span> <span id="minUnit">min</span></span></span>
+      </div>
+      <div class="goal-bar"><div class="goal-fill" id="goalFill"></div></div>
+    </div>
+
+    <div class="xp-block">
+      <div class="xp-head">
+        <span class="stage-name" id="stageName">Seed</span>
+        <span class="xp-num"><span id="xpNow">0</span> / <span id="xpNext">10</span> XP</span>
+      </div>
+      <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-stats">
+      <div class="stat"><b id="totalLabel">Total:</b><span id="totalStat">0m</span></div>
+      <div class="stat"><b id="sessionsLabel">Sessions:</b><span id="sessionsStat">0</span></div>
+      <div class="stat"><b id="bestStreakLabel">Best streak:</b><span id="bestStreakStat">0</span></div>
+    </div>
+    <div class="footer-actions">
+      <button class="icon-btn" id="musicBtn" title="Lofi music" aria-label="Lofi music">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="pipBtn" title="Mini timer" aria-label="Mini timer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>
+          <rect x="2" y="12" width="12" height="8" rx="1.5" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="achBtn" title="Achievements" aria-label="Achievements">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h12v6a6 6 0 0 1-12 0V3z"/>
+          <path d="M6 5H3a3 3 0 0 0 3 5"/>
+          <path d="M18 5h3a3 3 0 0 1-3 5"/>
+          <path d="M9 21h6"/>
+          <path d="M12 15v6"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="soundBtn" title="UI sounds" aria-label="UI sounds">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </button>
+      <div class="lang-wrap">
+        <button class="icon-btn" id="langBtn" title="Language" aria-label="Language">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </button>
+        <div class="lang-menu" id="langMenu"></div>
+      </div>
+      <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <label class="setting">
+      <span id="nameLabel">Name:</span>
+      <input type="text" id="nameInput" maxlength="16">
+    </label>
+    <label class="setting">
+      <span id="focusLabel">Focus, min:</span>
+      <input type="number" id="focusInput" min="1" max="180" step="1">
+    </label>
+    <label class="setting">
+      <span id="goalLabel">Daily goal, min:</span>
+      <input type="number" id="goalInput" min="10" max="600" step="5">
+    </label>
+    <label class="setting">
+      <span id="lofiLabel">Lofi:</span>
+      <input type="range" id="musicVolInput" min="0" max="100" step="1" value="45">
+    </label>
+    <button class="reset-btn" id="resetAllBtn">Reset progress</button>
+  </div>
+
+</main>
+
+<div class="modal" id="achModal">
+  <div class="modal-content">
+    <div class="modal-head">
+      <div class="modal-title">
+        <h2 id="achTitle">🏆 Achievements</h2>
+        <span class="modal-count" id="achCount">0 / 0</span>
+      </div>
+      <button class="modal-close" id="achClose" aria-label="Close">×</button>
+    </div>
+    <div class="ach-grid" id="achGrid"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* =========================================================
+   ПЕРСОНАЖИ
+========================================================= */
+function eyesSVG(cxL, cyL, cxR, cyR) {
+  return `
+    <g class="eyes eyes-normal">
+      <ellipse cx="${cxL}" cy="${cyL}" rx="9" ry="12" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR}" rx="9" ry="12" fill="#16162a"/>
+      <circle class="pupil" cx="${cxL}" cy="${cyL}" r="3.2" fill="white"/>
+      <circle class="pupil" cx="${cxR}" cy="${cyR}" r="3.2" fill="white"/>
+    </g>
+    <g class="eyes eyes-happy">
+      <path d="M ${cxL-10} ${cyL} Q ${cxL} ${cyL-10} ${cxL+10} ${cyL}" stroke="#16162a" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path d="M ${cxR-10} ${cyR} Q ${cxR} ${cyR-10} ${cxR+10} ${cyR}" stroke="#16162a" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="eyes eyes-sleepy">
+      <ellipse cx="${cxL}" cy="${cyL+2}" rx="9" ry="5" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR+2}" rx="9" ry="5" fill="#16162a"/>
+    </g>
+    <g class="eyes eyes-sad">
+      <ellipse cx="${cxL}" cy="${cyL+4}" rx="8" ry="10" fill="#16162a"/>
+      <ellipse cx="${cxR}" cy="${cyR+4}" rx="8" ry="10" fill="#16162a"/>
+      <circle cx="${cxL}" cy="${cyL+7}" r="2.6" fill="white"/>
+      <circle cx="${cxR}" cy="${cyR+7}" r="2.6" fill="white"/>
+      <path d="M ${cxL-12} ${cyL-8} Q ${cxL} ${cyL-12} ${cxL+8} ${cyL-6}" stroke="#16162a" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M ${cxR+12} ${cyR-8} Q ${cxR} ${cyR-12} ${cxR-8} ${cyR-6}" stroke="#16162a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="eyes eyes-blink">
+      <line x1="${cxL-10}" y1="${cyL}" x2="${cxL+10}" y2="${cyL}" stroke="#16162a" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="${cxR-10}" y1="${cyR}" x2="${cxR+10}" y2="${cyR}" stroke="#16162a" stroke-width="3.5" stroke-linecap="round"/>
+    </g>
+  `;
+}
+function mouthSVG(cx, cy) {
+  return `
+    <path class="mouth mouth-normal" d="M ${cx-12} ${cy} Q ${cx} ${cy+9} ${cx+12} ${cy}" stroke="#16162a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path class="mouth mouth-happy" d="M ${cx-16} ${cy-2} Q ${cx} ${cy+18} ${cx+16} ${cy-2}" stroke="#16162a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path class="mouth mouth-sad" d="M ${cx-12} ${cy+8} Q ${cx} ${cy-2} ${cx+12} ${cy+8}" stroke="#16162a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <line class="mouth mouth-focused" x1="${cx-10}" y1="${cy+4}" x2="${cx+10}" y2="${cy+4}" stroke="#16162a" stroke-width="3" stroke-linecap="round"/>
+  `;
+}
+function blushSVG(cxL, cxR, cy) {
+  return `
+    <ellipse class="blush" cx="${cxL}" cy="${cy}" rx="14" ry="9" fill="url(#blushGrad)"/>
+    <ellipse class="blush" cx="${cxR}" cy="${cy}" rx="14" ry="9" fill="url(#blushGrad)"/>
+  `;
+}
+const DEFS = `
+  <defs>
+    <radialGradient id="bodyGrad" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="var(--pet-1)"/>
+      <stop offset="100%" stop-color="var(--pet-2)"/>
+    </radialGradient>
+    <radialGradient id="blushGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,140,180,0.7)"/>
+      <stop offset="100%" stop-color="rgba(255,140,180,0)"/>
+    </radialGradient>
+  </defs>
+`;
+
+const CHARACTERS = {
+  pip: {
+    name: 'Pip', emoji: '🌱',
+    color: { c1: '#a3f0e0', c2: '#5fd4c0', glow: '163,240,224' },
+    body: 'M 100 28 C 148 28, 174 60, 174 106 C 174 152, 146 174, 100 174 C 54 174, 26 152, 26 106 C 26 60, 52 28, 100 28 Z',
+    back: '',
+    decor: `<ellipse cx="76" cy="58" rx="26" ry="14" fill="rgba(255,255,255,0.35)" transform="rotate(-25 76 58)"/>`,
+    eyesY: 100, mouthY: 124, blushY: 118
+  },
+  cat: {
+    name: 'Mya', emoji: '🐱',
+    color: { c1: '#ffb3d9', c2: '#f06fa8', glow: '255,179,217' },
+    body: 'M 100 28 C 148 28, 174 60, 174 106 C 174 152, 146 174, 100 174 C 54 174, 26 152, 26 106 C 26 60, 52 28, 100 28 Z',
+    back: `
+      <path d="M 58 55 L 46 12 L 88 34 Z" fill="url(#bodyGrad)"/>
+      <path d="M 142 55 L 154 12 L 112 34 Z" fill="url(#bodyGrad)"/>
+      <path d="M 63 50 L 55 24 L 80 38 Z" fill="rgba(255,220,235,0.5)"/>
+      <path d="M 137 50 L 145 24 L 120 38 Z" fill="rgba(255,220,235,0.5)"/>
+    `,
+    decor: `
+      <ellipse cx="76" cy="58" rx="26" ry="14" fill="rgba(255,255,255,0.3)" transform="rotate(-25 76 58)"/>
+      <path d="M 28 152 Q 0 168 12 185" stroke="url(#bodyGrad)" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.9"/>
+      <path d="M 100 122 L 92 128 L 100 132 L 108 128 Z" fill="#ff7aa8"/>
+    `,
+    eyesY: 98, mouthY: 128, blushY: 116
+  },
+  frog: {
+    name: 'Kva', emoji: '🐸',
+    color: { c1: '#b8f5a0', c2: '#6fce48', glow: '184,245,160' },
+    body: 'M 100 50 C 155 50, 178 78, 178 118 C 178 156, 148 178, 100 178 C 52 178, 22 156, 22 118 C 22 78, 45 50, 100 50 Z',
+    back: `
+      <circle cx="60" cy="48" r="22" fill="url(#bodyGrad)"/>
+      <circle cx="140" cy="48" r="22" fill="url(#bodyGrad)"/>
+      <circle cx="60" cy="48" r="13" fill="rgba(255,255,255,0.12)"/>
+      <circle cx="140" cy="48" r="13" fill="rgba(255,255,255,0.12)"/>
+    `,
+    decor: `<ellipse cx="70" cy="72" rx="22" ry="11" fill="rgba(255,255,255,0.28)" transform="rotate(-20 70 72)"/>`,
+    eyesY: 48, mouthY: 130, blushY: 122,
+    eyesX: { l: 60, r: 140 }, specialEyes: true
+  },
+  ghost: {
+    name: 'Boo', emoji: '👻',
+    color: { c1: '#c5b3ff', c2: '#9070e8', glow: '197,179,255' },
+    body: 'M 40 60 Q 40 22 100 22 Q 160 22 160 60 L 160 155 Q 150 175 140 155 Q 130 135 120 155 Q 110 175 100 155 Q 90 135 80 155 Q 70 175 60 155 Q 50 135 40 155 Z',
+    back: '',
+    decor: `<ellipse cx="76" cy="52" rx="24" ry="13" fill="rgba(255,255,255,0.4)" transform="rotate(-22 76 52)"/>`,
+    eyesY: 100, mouthY: 124, blushY: 118, opacity: 0.88
+  }
+};
+
+/* =========================================================
+   СТАДИИ
+========================================================= */
+const STAGES = [
+  { minXP: 0 }, { minXP: 10 }, { minXP: 45 }, { minXP: 150 },
+  { minXP: 420 }, { minXP: 900 }, { minXP: 1800 }, { minXP: 3600 }
+];
+
+/* =========================================================
+   ПЕРЕВОДЫ
+========================================================= */
+const I18N = {
+  ru: {
+    title: 'Пип — фокус-компаньон',
+    dragHint: 'Погладь · Потяни',
+    modeFocus: 'Фокус', modeShort: 'Перерыв', modeLong: 'Отдых',
+    timerReady: 'Готов начать', timerFocusing: 'Фокусируемся…', timerResting: 'Отдыхаем…',
+    timerBreakReady: 'Пора отдохнуть',
+    startFocus: 'Начать фокус', startBreak: 'Начать перерыв', startRest: 'Начать отдых',
+    pause: 'Пауза', resume: 'Продолжить', start: 'Старт',
+    sessionDone: 'Сессия завершена! +{n} XP', breakDone: 'Отдых окончен!',
+    today: 'Сегодня', min: 'мин',
+    total: 'Всего:', sessionsLabel: 'Сессий:', bestStreakLabel: 'Лучший стрик:',
+    streakUnit: ['день','дня','дней'], streakSuffix: 'подряд',
+    settingsTitle: 'Настройки', soundTitle: 'Звуки интерфейса',
+    musicTitle: 'Lofi музыка', musicLive: 'Lofi: {style} · {bpm} BPM',
+    pipTitle: 'Мини-таймер (поверх окон)', achTitle: '🏆 Достижения', langTitle: 'Язык',
+    nameLabel: 'Имя:', focusLabel: 'Фокус, мин:', goalLabel: 'Цель дня, мин:',
+    lofiLabel: 'Lofi:', resetProgress: 'Сбросить прогресс',
+    resetConfirm: 'Точно сбросить весь прогресс? Питомец начнёт с нуля 🥺',
+    newAchievement: 'Новое достижение',
+    pipNotSupported: 'Картинка-в-картинке не поддерживается этим браузером.\nИспользуйте Chrome 116+ или Edge 116+.',
+    audioFailed: 'Не удалось запустить аудио.',
+    resetTitle: 'Сброс', closeTitle: 'Закрыть',
+    stages: ['Семечко','Росток','Малыш','Кроха','Подросток','Взрослый','Мудрец','Легенда'],
+    ach: {
+      s_1:['Первая сессия','Заверши свою первую фокус-сессию'],
+      s_10:['Разогрев','Заверши 10 сессий'],
+      s_50:['Серьёзный подход','Заверши 50 сессий'],
+      s_100:['Сотка','Заверши 100 сессий'],
+      s_500:['Мастер фокуса','Заверши 500 сессий'],
+      t_1h:['Час силы','1 час концентрации'],
+      t_10h:['Десять часов','10 часов концентрации'],
+      t_50h:['Полсотни','50 часов концентрации'],
+      t_100h:['Сто часов','100 часов концентрации'],
+      st_3:['Три дня подряд','Стрик 3 дня'],
+      st_7:['Неделя','Стрик 7 дней подряд'],
+      st_30:['Месяц','Стрик 30 дней подряд'],
+      st_100:['Сто дней','Стрик 100 дней подряд'],
+      stg_2:['Росток','Достигни стадии Росток'],
+      stg_5:['Подросток','Достигни стадии Подросток'],
+      stg_7:['Мудрец','Достигни стадии Мудрец'],
+      stg_8:['Легенда','Достигни стадии Легенда'],
+      g_1:['Цель дня','Выполни дневную цель фокуса'],
+      g_7:['Продуктивная неделя','7 дней с выполненной целью'],
+      g_30:['Продуктивный месяц','30 дней с выполненной целью']
+    }
+  },
+  en: {
+    title: 'Pip — Focus Companion',
+    dragHint: 'Pet · Drag',
+    modeFocus: 'Focus', modeShort: 'Break', modeLong: 'Rest',
+    timerReady: 'Ready to start', timerFocusing: 'Focusing…', timerResting: 'Resting…',
+    timerBreakReady: 'Time to rest',
+    startFocus: 'Start focus', startBreak: 'Start break', startRest: 'Start rest',
+    pause: 'Pause', resume: 'Resume', start: 'Start',
+    sessionDone: 'Session complete! +{n} XP', breakDone: 'Break is over!',
+    today: 'Today', min: 'min',
+    total: 'Total:', sessionsLabel: 'Sessions:', bestStreakLabel: 'Best streak:',
+    streakUnit: ['day','days'], streakSuffix: 'in a row',
+    settingsTitle: 'Settings', soundTitle: 'UI sounds',
+    musicTitle: 'Lofi music', musicLive: 'Lofi: {style} · {bpm} BPM',
+    pipTitle: 'Mini timer (on top)', achTitle: '🏆 Achievements', langTitle: 'Language',
+    nameLabel: 'Name:', focusLabel: 'Focus, min:', goalLabel: 'Daily goal, min:',
+    lofiLabel: 'Lofi:', resetProgress: 'Reset progress',
+    resetConfirm: 'Reset all progress? Your pet will start over 🥺',
+    newAchievement: 'New achievement',
+    pipNotSupported: 'Picture-in-Picture is not supported in this browser.\nUse Chrome 116+ or Edge 116+.',
+    audioFailed: 'Could not start audio.',
+    resetTitle: 'Reset', closeTitle: 'Close',
+    stages: ['Seed','Sprout','Baby','Tiny','Teen','Adult','Sage','Legend'],
+    ach: {
+      s_1:['First session','Complete your first focus session'],
+      s_10:['Warm-up','Complete 10 sessions'],
+      s_50:['Serious approach','Complete 50 sessions'],
+      s_100:['Century','Complete 100 sessions'],
+      s_500:['Focus master','Complete 500 sessions'],
+      t_1h:['Hour of power','1 hour of focus'],
+      t_10h:['Ten hours','10 hours of focus'],
+      t_50h:['Fifty','50 hours of focus'],
+      t_100h:['Hundred hours','100 hours of focus'],
+      st_3:['Three in a row','3-day streak'],
+      st_7:['A week','7-day streak'],
+      st_30:['A month','30-day streak'],
+      st_100:['Hundred days','100-day streak'],
+      stg_2:['Sprout','Reach the Sprout stage'],
+      stg_5:['Teen','Reach the Teen stage'],
+      stg_7:['Sage','Reach the Sage stage'],
+      stg_8:['Legend','Reach the Legend stage'],
+      g_1:['Daily goal','Complete your daily focus goal'],
+      g_7:['Productive week','7 days with completed goal'],
+      g_30:['Productive month','30 days with completed goal']
+    }
+  },
+  uk: {
+    title: 'Піп — фокус-компаньйон',
+    dragHint: 'Погладь · Потягни',
+    modeFocus: 'Фокус', modeShort: 'Перерва', modeLong: 'Відпочинок',
+    timerReady: 'Готовий почати', timerFocusing: 'Фокусуємось…', timerResting: 'Відпочиваємо…',
+    timerBreakReady: 'Час відпочити',
+    startFocus: 'Почати фокус', startBreak: 'Почати перерву', startRest: 'Почати відпочинок',
+    pause: 'Пауза', resume: 'Продовжити', start: 'Старт',
+    sessionDone: 'Сесію завершено! +{n} XP', breakDone: 'Відпочинок закінчено!',
+    today: 'Сьогодні', min: 'хв',
+    total: 'Всього:', sessionsLabel: 'Сесій:', bestStreakLabel: 'Найкращий стрік:',
+    streakUnit: ['день','дні','днів'], streakSuffix: 'поспіль',
+    settingsTitle: 'Налаштування', soundTitle: 'Звуки інтерфейсу',
+    musicTitle: 'Lofi музика', musicLive: 'Lofi: {style} · {bpm} BPM',
+    pipTitle: 'Міні-таймер (поверх вікон)', achTitle: '🏆 Досягнення', langTitle: 'Мова',
+    nameLabel: "Ім'я:", focusLabel: 'Фокус, хв:', goalLabel: 'Ціль дня, хв:',
+    lofiLabel: 'Lofi:', resetProgress: 'Скинути прогрес',
+    resetConfirm: 'Точно скинути весь прогрес? Улюбленець почне з нуля 🥺',
+    newAchievement: 'Нове досягнення',
+    pipNotSupported: 'Картинка-в-картинці не підтримується цим браузером.\nВикористовуйте Chrome 116+ або Edge 116+.',
+    audioFailed: 'Не вдалося запустити аудіо.',
+    resetTitle: 'Скинути', closeTitle: 'Закрити',
+    stages: ['Насіння','Паросток','Малюк','Крихітка','Підліток','Дорослий','Мудрець','Легенда'],
+    ach: {
+      s_1:['Перша сесія','Заверши свою першу фокус-сесію'],
+      s_10:['Розминка','Заверши 10 сесій'],
+      s_50:['Серйозний підхід','Заверши 50 сесій'],
+      s_100:['Сотня','Заверши 100 сесій'],
+      s_500:['Майстер фокусу','Заверши 500 сесій'],
+      t_1h:['Година сили','1 година концентрації'],
+      t_10h:['Десять годин','10 годин концентрації'],
+      t_50h:["П'ятдесят",'50 годин концентрації'],
+      t_100h:['Сто годин','100 годин концентрації'],
+      st_3:['Три дні підряд','Стрік 3 дні'],
+      st_7:['Тиждень','Стрік 7 днів підряд'],
+      st_30:['Місяць','Стрік 30 днів підряд'],
+      st_100:['Сто днів','Стрік 100 днів підряд'],
+      stg_2:['Паросток','Досягни стадії Паросток'],
+      stg_5:['Підліток','Досягни стадії Підліток'],
+      stg_7:['Мудрець','Досягни стадії Мудрець'],
+      stg_8:['Легенда','Досягни стадії Легенда'],
+      g_1:['Ціль дня','Виконай денну ціль фокусу'],
+      g_7:['Продуктивний тиждень','7 днів з виконаною ціллю'],
+      g_30:['Продуктивний місяць','30 днів з виконаною ціллю']
+    }
+  },
+  es: {
+    title: 'Pip — Compañero de enfoque',
+    dragHint: 'Acaricia · Arrastra',
+    modeFocus: 'Enfoque', modeShort: 'Descanso', modeLong: 'Pausa',
+    timerReady: 'Listo para empezar', timerFocusing: 'Enfocando…', timerResting: 'Descansando…',
+    timerBreakReady: 'Hora de descansar',
+    startFocus: 'Empezar enfoque', startBreak: 'Empezar descanso', startRest: 'Empezar pausa',
+    pause: 'Pausa', resume: 'Continuar', start: 'Iniciar',
+    sessionDone: '¡Sesión completa! +{n} XP', breakDone: '¡Descanso terminado!',
+    today: 'Hoy', min: 'min',
+    total: 'Total:', sessionsLabel: 'Sesiones:', bestStreakLabel: 'Mejor racha:',
+    streakUnit: ['día','días'], streakSuffix: 'seguidos',
+    settingsTitle: 'Ajustes', soundTitle: 'Sonidos de interfaz',
+    musicTitle: 'Música lofi', musicLive: 'Lofi: {style} · {bpm} BPM',
+    pipTitle: 'Mini-temporizador (arriba)', achTitle: '🏆 Logros', langTitle: 'Idioma',
+    nameLabel: 'Nombre:', focusLabel: 'Enfoque, min:', goalLabel: 'Meta diaria, min:',
+    lofiLabel: 'Lofi:', resetProgress: 'Reiniciar progreso',
+    resetConfirm: '¿Reiniciar todo el progreso? Tu mascota empezará de cero 🥺',
+    newAchievement: 'Nuevo logro',
+    pipNotSupported: 'La imagen en imagen no es compatible con este navegador.\nUsa Chrome 116+ o Edge 116+.',
+    audioFailed: 'No se pudo iniciar el audio.',
+    resetTitle: 'Reiniciar', closeTitle: 'Cerrar',
+    stages: ['Semilla','Brote','Bebé','Pequeño','Adolescente','Adulto','Sabio','Leyenda'],
+    ach: {
+      s_1:['Primera sesión','Completa tu primera sesión de enfoque'],
+      s_10:['Calentamiento','Completa 10 sesiones'],
+      s_50:['Enfoque serio','Completa 50 sesiones'],
+      s_100:['Centena','Completa 100 sesiones'],
+      s_500:['Maestro del enfoque','Completa 500 sesiones'],
+      t_1h:['Hora de poder','1 hora de concentración'],
+      t_10h:['Diez horas','10 horas de concentración'],
+      t_50h:['Cincuenta','50 horas de concentración'],
+      t_100h:['Cien horas','100 horas de concentración'],
+      st_3:['Tres seguidos','Racha de 3 días'],
+      st_7:['Una semana','Racha de 7 días'],
+      st_30:['Un mes','Racha de 30 días'],
+      st_100:['Cien días','Racha de 100 días'],
+      stg_2:['Brote','Alcanza la etapa Brote'],
+      stg_5:['Adolescente','Alcanza la etapa Adolescente'],
+      stg_7:['Sabio','Alcanza la etapa Sabio'],
+      stg_8:['Leyenda','Alcanza la etapa Leyenda'],
+      g_1:['Meta diaria','Completa tu meta diaria de enfoque'],
+      g_7:['Semana productiva','7 días con la meta completada'],
+      g_30:['Mes productivo','30 días con la meta completada']
+    }
+  },
+  zh: {
+    title: 'Pip — 专注伴侣',
+    dragHint: '抚摸 · 拖动',
+    modeFocus: '专注', modeShort: '休息', modeLong: '放松',
+    timerReady: '准备开始', timerFocusing: '专注中…', timerResting: '休息中…',
+    timerBreakReady: '该休息了',
+    startFocus: '开始专注', startBreak: '开始休息', startRest: '开始放松',
+    pause: '暂停', resume: '继续', start: '开始',
+    sessionDone: '本次完成！+{n} XP', breakDone: '休息结束！',
+    today: '今天', min: '分钟',
+    total: '总计：', sessionsLabel: '次数：', bestStreakLabel: '最佳连续：',
+    streakUnit: [''], streakSuffix: '',
+    settingsTitle: '设置', soundTitle: '界面音效',
+    musicTitle: 'Lofi 音乐', musicLive: 'Lofi：{style} · {bpm} BPM',
+    pipTitle: '迷你计时器（置顶）', achTitle: '🏆 成就', langTitle: '语言',
+    nameLabel: '名字：', focusLabel: '专注，分钟：', goalLabel: '每日目标，分钟：',
+    lofiLabel: 'Lofi：', resetProgress: '重置进度',
+    resetConfirm: '确定重置所有进度吗？宠物将从零开始 🥺',
+    newAchievement: '新成就',
+    pipNotSupported: '此浏览器不支持画中画。\n请使用 Chrome 116+ 或 Edge 116+。',
+    audioFailed: '无法启动音频。',
+    resetTitle: '重置', closeTitle: '关闭',
+    stages: ['种子','幼苗','宝宝','小不点','少年','成年','智者','传说'],
+    ach: {
+      s_1:['第一次','完成你的第一次专注'],
+      s_10:['热身','完成 10 次专注'],
+      s_50:['认真起来','完成 50 次专注'],
+      s_100:['百次','完成 100 次专注'],
+      s_500:['专注大师','完成 500 次专注'],
+      t_1h:['一小时的坚持','累计 1 小时专注'],
+      t_10h:['十小时','累计 10 小时专注'],
+      t_50h:['五十小时','累计 50 小时专注'],
+      t_100h:['一百小时','累计 100 小时专注'],
+      st_3:['连续三天','连续 3 天'],
+      st_7:['一周','连续 7 天'],
+      st_30:['一个月','连续 30 天'],
+      st_100:['一百天','连续 100 天'],
+      stg_2:['幼苗','达到「幼苗」阶段'],
+      stg_5:['少年','达到「少年」阶段'],
+      stg_7:['智者','达到「智者」阶段'],
+      stg_8:['传说','达到「传说」阶段'],
+      g_1:['每日目标','完成每日专注目标'],
+      g_7:['高效的一周','7 天完成目标'],
+      g_30:['高效的一月','30 天完成目标']
+    }
+  },
+  ja: {
+    title: 'Pip — 集中の相棒',
+    dragHint: 'なでる · ひっぱる',
+    modeFocus: '集中', modeShort: '休憩', modeLong: '休息',
+    timerReady: '始める準備OK', timerFocusing: '集中中…', timerResting: '休憩中…',
+    timerBreakReady: '休憩の時間',
+    startFocus: '集中を始める', startBreak: '休憩を始める', startRest: '休息を始める',
+    pause: '一時停止', resume: '再開', start: 'スタート',
+    sessionDone: 'セッション完了！+{n} XP', breakDone: '休憩終了！',
+    today: '今日', min: '分',
+    total: '合計：', sessionsLabel: 'セッション：', bestStreakLabel: '最高連続：',
+    streakUnit: [''], streakSuffix: '',
+    settingsTitle: '設定', soundTitle: 'UIサウンド',
+    musicTitle: 'Lofi 音楽', musicLive: 'Lofi：{style} · {bpm} BPM',
+    pipTitle: 'ミニタイマー（常に手前）', achTitle: '🏆 実績', langTitle: '言語',
+    nameLabel: '名前：', focusLabel: '集中、分：', goalLabel: '1日の目標、分：',
+    lofiLabel: 'Lofi：', resetProgress: '進捗をリセット',
+    resetConfirm: '本当にすべての進捗をリセットしますか？ペットは最初からやり直します 🥺',
+    newAchievement: '新しい実績',
+    pipNotSupported: 'このブラウザはピクチャーインピクチャーに対応していません。\nChrome 116+ または Edge 116+ をご利用ください。',
+    audioFailed: '音声を開始できませんでした。',
+    resetTitle: 'リセット', closeTitle: '閉じる',
+    stages: ['種','芽','赤ちゃん','ちび','ティーン','大人','賢者','伝説'],
+    ach: {
+      s_1:['初セッション','最初の集中セッションを完了'],
+      s_10:['ウォームアップ','10セッションを完了'],
+      s_50:['本気モード','50セッションを完了'],
+      s_100:['100回','100セッションを完了'],
+      s_500:['集中の達人','500セッションを完了'],
+      t_1h:['1時間の力','1時間の集中'],
+      t_10h:['10時間','10時間の集中'],
+      t_50h:['50時間','50時間の集中'],
+      t_100h:['100時間','100時間の集中'],
+      st_3:['3日連続','3日連続'],
+      st_7:['1週間','7日連続'],
+      st_30:['1ヶ月','30日連続'],
+      st_100:['100日','100日連続'],
+      stg_2:['芽','ステージ「芽」に到達'],
+      stg_5:['ティーン','ステージ「ティーン」に到達'],
+      stg_7:['賢者','ステージ「賢者」に到達'],
+      stg_8:['伝説','ステージ「伝説」に到達'],
+      g_1:['1日の目標','1日の集中目標を達成'],
+      g_7:['実りのある1週間','目標達成7日'],
+      g_30:['実りのある1ヶ月','目標達成30日']
+    }
+  },
+  ko: {
+    title: 'Pip — 집중 친구',
+    dragHint: '쓰다듬기 · 끌기',
+    modeFocus: '집중', modeShort: '휴식', modeLong: '쉼',
+    timerReady: '시작할 준비 완료', timerFocusing: '집중 중…', timerResting: '휴식 중…',
+    timerBreakReady: '쉴 시간이에요',
+    startFocus: '집중 시작', startBreak: '휴식 시작', startRest: '쉼 시작',
+    pause: '일시정지', resume: '계속', start: '시작',
+    sessionDone: '세션 완료! +{n} XP', breakDone: '휴식 끝!',
+    today: '오늘', min: '분',
+    total: '합계:', sessionsLabel: '세션:', bestStreakLabel: '최고 연속:',
+    streakUnit: [''], streakSuffix: '',
+    settingsTitle: '설정', soundTitle: '인터페이스 소리',
+    musicTitle: 'Lofi 음악', musicLive: 'Lofi: {style} · {bpm} BPM',
+    pipTitle: '미니 타이머 (항상 위)', achTitle: '🏆 업적', langTitle: '언어',
+    nameLabel: '이름:', focusLabel: '집중, 분:', goalLabel: '일일 목표, 분:',
+    lofiLabel: 'Lofi:', resetProgress: '진행 초기화',
+    resetConfirm: '모든 진행을 초기화할까요? 펫이 처음부터 다시 시작해요 🥺',
+    newAchievement: '새 업적',
+    pipNotSupported: '이 브라우저는 PIP를 지원하지 않습니다.\nChrome 116+ 또는 Edge 116+를 사용하세요.',
+    audioFailed: '오디오를 시작할 수 없습니다.',
+    resetTitle: '초기화', closeTitle: '닫기',
+    stages: ['씨앗','새싹','아기','꼬마','청소년','어른','현자','전설'],
+    ach: {
+      s_1:['첫 세션','첫 집중 세션 완료'],
+      s_10:['워밍업','10 세션 완료'],
+      s_50:['진지한 시작','50 세션 완료'],
+      s_100:['100회','100 세션 완료'],
+      s_500:['집중의 달인','500 세션 완료'],
+      t_1h:['1시간의 힘','1시간 집중'],
+      t_10h:['10시간','10시간 집중'],
+      t_50h:['50시간','50시간 집중'],
+      t_100h:['100시간','100시간 집중'],
+      st_3:['3일 연속','3일 연속'],
+      st_7:['일주일','7일 연속'],
+      st_30:['한 달','30일 연속'],
+      st_100:['100일','100일 연속'],
+      stg_2:['새싹','단계 "새싹" 도달'],
+      stg_5:['청소년','단계 "청소년" 도달'],
+      stg_7:['현자','단계 "현자" 도달'],
+      stg_8:['전설','단계 "전설" 도달'],
+      g_1:['일일 목표','오늘의 집중 목표 달성'],
+      g_7:['생산적인 한 주','목표 달성 7일'],
+      g_30:['생산적인 한 달','목표 달성 30일']
+    }
+  }
+};
+
+const LANG_INFO = [
+  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
+  { code: 'uk', flag: '🇺🇦', name: 'Українська' },
+  { code: 'en', flag: '🇬🇧', name: 'English' },
+  { code: 'es', flag: '🇪🇸', name: 'Español' },
+  { code: 'zh', flag: '🇨🇳', name: '中文' },
+  { code: 'ja', flag: '🇯🇵', name: '日本語' },
+  { code: 'ko', flag: '🇰🇷', name: '한국어' }
+];
+
+function detectLanguage() {
+  const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+  for (const raw of list) {
+    const l = String(raw).toLowerCase();
+    if (l.startsWith('ru')) return 'ru';
+    if (l.startsWith('uk')) return 'uk';
+    if (l.startsWith('es')) return 'es';
+    if (l.startsWith('zh')) return 'zh';
+    if (l.startsWith('ja')) return 'ja';
+    if (l.startsWith('ko')) return 'ko';
+    if (l.startsWith('en')) return 'en';
+  }
+  return 'en';
+}
+function t(key) {
+  const dict = I18N[state.lang] || I18N.en;
+  return dict[key] !== undefined ? dict[key] : (I18N.en[key] !== undefined ? I18N.en[key] : key);
+}
+
+/* =========================================================
+   ДОСТИЖЕНИЯ
+========================================================= */
+const ACHIEVEMENTS = [
+  { id:'s_1',   icon:'🌱', check: s=>s.sessions>=1 },
+  { id:'s_10',  icon:'🎯', check: s=>s.sessions>=10 },
+  { id:'s_50',  icon:'🎖️', check: s=>s.sessions>=50 },
+  { id:'s_100', icon:'🏅', check: s=>s.sessions>=100 },
+  { id:'s_500', icon:'👑', check: s=>s.sessions>=500 },
+  { id:'t_1h',  icon:'⏱️', check: s=>s.totalFocusSeconds>=3600 },
+  { id:'t_10h', icon:'⏳', check: s=>s.totalFocusSeconds>=36000 },
+  { id:'t_50h', icon:'🕰️', check: s=>s.totalFocusSeconds>=180000 },
+  { id:'t_100h',icon:'💎', check: s=>s.totalFocusSeconds>=360000 },
+  { id:'st_3',  icon:'🔥', check: s=>s.bestStreak>=3 },
+  { id:'st_7',  icon:'🔥', check: s=>s.bestStreak>=7 },
+  { id:'st_30', icon:'🌋', check: s=>s.bestStreak>=30 },
+  { id:'st_100',icon:'☄️', check: s=>s.bestStreak>=100 },
+  { id:'stg_2', icon:'🌿', check: s=>s.xp>=10 },
+  { id:'stg_5', icon:'🚀', check: s=>s.xp>=420 },
+  { id:'stg_7', icon:'🧙', check: s=>s.xp>=1800 },
+  { id:'stg_8', icon:'✨', check: s=>s.xp>=3600 },
+  { id:'g_1',   icon:'✅', check: s=>(s.daily[todayKey()]||0)>=s.goalMin*60 },
+  { id:'g_7',   icon:'📅', check: s=>{ let c=0; for(const k in s.daily) if(s.daily[k]>=s.goalMin*60) c++; return c>=7; } },
+  { id:'g_30',  icon:'🗓️', check: s=>{ let c=0; for(const k in s.daily) if(s.daily[k]>=s.goalMin*60) c++; return c>=30; } }
+];
+
+/* =========================================================
+   ХРАНИЛИЩЕ
+========================================================= */
+const STORAGE_KEY = 'pip-focus-companion-v4';
+const defaultState = {
+  petName: 'Pip', character: 'pip',
+  xp: 0, totalFocusSeconds: 0, sessions: 0,
+  focusDuration: 25 * 60, shortBreak: 5 * 60, longBreak: 15 * 60,
+  goalMin: 60, soundOn: true, musicVolume: 45,
+  daily: {}, streak: 0, bestStreak: 0, lastFocusDate: null,
+  achievements: [], lang: null
+};
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...defaultState };
+    return { ...defaultState, ...JSON.parse(raw) };
+  } catch { return { ...defaultState }; }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+let state = loadState();
+
+/* =========================================================
+   ТАЙМЕР
+========================================================= */
+const timer = { mode:'focus', duration:state.focusDuration, remaining:state.focusDuration, running:false, endAt:null };
+
+/* =========================================================
+   DOM
+========================================================= */
+const $ = id => document.getElementById(id);
+const clockEl=$('clock'), timerStateEl=$('timerState'), startBtn=$('startBtn'), resetBtn=$('resetBtn');
+const modeBtns=document.querySelectorAll('.mode-btn');
+const stageEl=$('stage'), petWrapper=$('petWrapper'), petSvg=$('petSvg');
+const petNameEl=$('petName'), levelBadge=$('levelBadge'), stageNameEl=$('stageName');
+const xpNowEl=$('xpNow'), xpNextEl=$('xpNext'), xpFill=$('xpFill');
+const todayMinEl=$('todayMin'), goalMinEl=$('goalMin'), goalFill=$('goalFill');
+const todayLabelEl=$('todayLabel'), minUnitEl=$('minUnit');
+const totalStatEl=$('totalStat'), sessionsStatEl=$('sessionsStat'), bestStreakEl=$('bestStreakStat');
+const totalLabelEl=$('totalLabel'), sessionsLabelEl=$('sessionsLabel'), bestStreakLabelEl=$('bestStreakLabel');
+const streakBadge=$('streakBadge'), streakText=$('streakText');
+const soundBtn=$('soundBtn'), musicBtn=$('musicBtn'), pipBtn=$('pipBtn'), achBtn=$('achBtn');
+const langBtn=$('langBtn'), langMenu=$('langMenu'), settingsBtn=$('settingsBtn');
+const settingsPanel=$('settingsPanel');
+const nameInput=$('nameInput'), focusInput=$('focusInput'), goalInput=$('goalInput'), musicVolInput=$('musicVolInput');
+const nameLabelEl=$('nameLabel'), focusLabelEl=$('focusLabel'), goalLabelEl=$('goalLabel'), lofiLabelEl=$('lofiLabel');
+const resetAllBtn=$('resetAllBtn');
+const charPicker=$('charPicker'), dragHint=$('dragHint');
+const achModal=$('achModal'), achGrid=$('achGrid'), achCount=$('achCount'), achClose=$('achClose'), achTitleEl=$('achTitle');
+const toastContainer=$('toastContainer');
+
+/* =========================================================
+   УТИЛИТЫ
+========================================================= */
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todaySeconds() { return state.daily[todayKey()] || 0; }
+
+function formatDuration(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  const lang = state.lang;
+  const hU = lang==='ru' ? 'ч' : lang==='uk' ? 'год' : 'h';
+  const mU = lang==='ru' ? 'м' : lang==='uk' ? 'хв' : 'm';
+  if (h>0) return `${h}${hU} ${m}${mU}`;
+  return `${m}${mU}`;
+}
+function formatClock(sec) {
+  const m = Math.floor(sec/60), s = sec%60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function getStageIdx() {
+  let idx = 0;
+  for (let i=0; i<STAGES.length; i++) if (state.xp >= STAGES[i].minXP) idx = i;
+  return idx;
+}
+function getNextStage() {
+  for (const s of STAGES) if (state.xp < s.minXP) return s;
+  return null;
+}
+function pluralRu(n) {
+  const m10 = n%10, m100 = n%100;
+  if (m10===1 && m100!==11) return 'день';
+  if (m10>=2 && m10<=4 && (m100<10 || m100>=20)) return 'дня';
+  return 'дней';
+}
+function pluralUk(n) {
+  const m10 = n%10, m100 = n%100;
+  if (m10===1 && m100!==11) return 'день';
+  if (m10>=2 && m10<=4 && (m100<10 || m100>=20)) return 'дні';
+  return 'днів';
+}
+function formatStreak(n) {
+  const lang = state.lang;
+  if (lang === 'zh') return `连续 ${n} 天`;
+  if (lang === 'ja') return `${n}日連続`;
+  if (lang === 'ko') return `${n}일 연속`;
+  if (lang === 'en') return `${n} ${n===1 ? 'day' : 'days'} in a row`;
+  if (lang === 'es') return `${n} ${n===1 ? 'día' : 'días'} seguidos`;
+  if (lang === 'uk') return `${n} ${pluralUk(n)} поспіль`;
+  return `${n} ${pluralRu(n)} подряд`;
+}
+
+/* Цветовые утилиты */
+function hexToHsl(hex) {
+  const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h=0, s=0, l=(max+min)/2;
+  if (max!==min) {
+    const d=max-min; s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){ case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; case b: h=(r-g)/d+4; break; }
+    h/=6;
+  }
+  return [h,s,l];
+}
+function hslToHex(h,s,l) {
+  const f=(p,q,t)=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; };
+  let r,g,b;
+  if (s===0) { r=g=b=l; }
+  else {
+    const q=l<0.5 ? l*(1+s) : l+s-l*s;
+    const p=2*l-q;
+    r=f(p,q,h+1/3); g=f(p,q,h); b=f(p,q,h-1/3);
+  }
+  const toHex = x => Math.round(x*255).toString(16).padStart(2,'0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+function boostHex(hex, satMul, lightMul) {
+  const [h,s,l] = hexToHsl(hex);
+  return hslToHex(h, Math.min(1, s*satMul), Math.min(0.95, l*lightMul));
+}
+
+/* =========================================================
+   РЕНДЕР ПИТОМЦА
+========================================================= */
+function renderPet() {
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  const ey = ch.eyesY;
+  const eyL = ch.specialEyes ? ch.eyesX.l : 72;
+  const eyR = ch.specialEyes ? ch.eyesX.r : 128;
+  const opacity = ch.opacity || 1;
+
+  petSvg.innerHTML = `
+    ${DEFS}
+    <ellipse id="petShadow" cx="100" cy="182" rx="52" ry="7" fill="rgba(0,0,0,0.35)"/>
+    <g opacity="${opacity}">
+      ${ch.back}
+      <path class="pet-body-path" id="petBody" d="${ch.body}" fill="url(#bodyGrad)"/>
+      ${ch.decor}
+    </g>
+    ${blushSVG(52, 148, ch.blushY)}
+    ${eyesSVG(eyL, ey, eyR, ey)}
+    ${mouthSVG(100, ch.mouthY)}
+  `;
+  bindPupils();
+  applyMood(currentMood);
+}
+let pupils = [];
+function bindPupils() { pupils = document.querySelectorAll('.pupil'); }
+
+function applyStageColors() {
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  const stageIdx = getStageIdx();
+  const satBoost = 0.78 + (stageIdx/7) * 0.37;
+  const lightBoost = 0.94 + (stageIdx/7) * 0.10;
+
+  const c1 = boostHex(ch.color.c1, satBoost, lightBoost);
+  const c2 = boostHex(ch.color.c2, satBoost, lightBoost);
+  const glowStr = ch.color.glow.split(',').map(v => Math.min(255, Math.round(Number(v) * lightBoost))).join(',');
+
+  const root = document.documentElement;
+  root.style.setProperty('--pet-1', c1);
+  root.style.setProperty('--pet-2', c2);
+  root.style.setProperty('--pet-glow', glowStr);
+  root.style.setProperty('--bg-1', `rgb(${mix(glowStr, [14,14,23], 0.7)})`);
+  updatePipTheme();
+}
+function mix(rgbStr, baseRgb, ratio) {
+  const c = rgbStr.split(',').map(Number);
+  return c.map((v,i) => Math.round(v*(1-ratio) + baseRgb[i]*ratio));
+}
+
+/* =========================================================
+   ЭМОЦИИ
+========================================================= */
+const MOODS = {
+  focused:{ eyes:'normal', mouth:'focused' }, happy:{ eyes:'happy', mouth:'happy' },
+  content:{ eyes:'normal', mouth:'happy' }, neutral:{ eyes:'normal', mouth:'normal' },
+  sleepy:{ eyes:'sleepy', mouth:'normal' }, sad:{ eyes:'sad', mouth:'sad' },
+  blink:{ eyes:'blink', mouth:'normal' }
+};
+let currentMood = 'neutral', tempEmotion = null, tempEmotionTimeout = null;
+
+function computeMood() {
+  const todaySec = todaySeconds();
+  const goalSec = state.goalMin * 60;
+  const hour = new Date().getHours();
+  if (state.lastFocusDate && state.lastFocusDate < yesterdayKey()) return 'sad';
+  if (todaySec === 0 && (hour >= 21 || hour < 6)) return 'sleepy';
+  if (todaySec >= goalSec) return 'happy';
+  if (todaySec > 0) return 'content';
+  return 'neutral';
+}
+function applyMood(mood) {
+  const m = MOODS[mood] || MOODS.neutral;
+  currentMood = mood;
+  document.querySelectorAll('.eyes').forEach(g => g.classList.remove('visible'));
+  document.querySelectorAll('.mouth').forEach(g => g.classList.remove('visible'));
+  const eyeGroup = document.querySelector(`.eyes-${m.eyes}`);
+  const mouthGroup = document.querySelector(`.mouth-${m.mouth}`);
+  if (eyeGroup) eyeGroup.classList.add('visible');
+  if (mouthGroup) mouthGroup.classList.add('visible');
+  petWrapper.classList.remove('focused','sleepy','sad');
+  stageEl.classList.remove('focused','sleepy');
+  if (mood==='focused') { petWrapper.classList.add('focused'); stageEl.classList.add('focused'); }
+  else if (mood==='sleepy') { petWrapper.classList.add('sleepy'); stageEl.classList.add('sleepy'); }
+  else if (mood==='sad') petWrapper.classList.add('sad');
+  document.querySelectorAll('.blush').forEach(el => {
+    el.style.opacity = (mood==='happy') ? '1' : (mood==='focused' ? '0.8' : '0.55');
+  });
+}
+function setTemporaryEmotion(emotion, duration = 2000) {
+  tempEmotion = emotion;
+  applyMood(emotion);
+  clearTimeout(tempEmotionTimeout);
+  tempEmotionTimeout = setTimeout(() => { tempEmotion = null; applyMood(computeMood()); }, duration);
+}
+function blink() {
+  if (tempEmotion === 'sleepy' || currentMood === 'sleepy') return;
+  const visible = document.querySelector('.eyes.visible');
+  if (!visible || visible.classList.contains('eyes-blink')) return;
+  visible.classList.remove('visible');
+  const blinkGroup = document.querySelector('.eyes-blink');
+  if (blinkGroup) blinkGroup.classList.add('visible');
+  setTimeout(() => { if (blinkGroup) blinkGroup.classList.remove('visible'); visible.classList.add('visible'); }, 130);
+}
+function startBlinking() {
+  function schedule() {
+    const delay = 2200 + Math.random() * 4500;
+    setTimeout(() => { blink(); schedule(); }, delay);
+  }
+  schedule();
+}
+
+/* =========================================================
+   АВТОНОМНЫЕ ЭМОЦИИ
+========================================================= */
+let lastInteraction = Date.now();
+function startIdleBehavior() {
+  setInterval(() => {
+    if (tempEmotion || isDragging) return;
+    const idle = Date.now() - lastInteraction;
+    if (idle > 40000 && !(timer.running && timer.mode==='focus')) {
+      if (currentMood !== 'sleepy') setTemporaryEmotion('sleepy', 25000);
+      return;
+    }
+    if (timer.running && timer.mode==='focus') return;
+    if (Math.random() < 0.32) {
+      const options = ['happy','neutral','content','sleepy'];
+      setTemporaryEmotion(options[Math.floor(Math.random()*options.length)], 2500 + Math.random()*3000);
+    }
+  }, 5500);
+}
+
+/* =========================================================
+   РЕНДЕР
+========================================================= */
+function render() {
+  petNameEl.textContent = state.petName;
+
+  const stageIdx = getStageIdx();
+  const next = getNextStage();
+  const stageName = t('stages')[stageIdx];
+  levelBadge.textContent = stageName;
+  stageNameEl.textContent = stageName;
+
+  xpNowEl.textContent = state.xp;
+  if (next) {
+    xpNextEl.textContent = next.minXP;
+    const cur = STAGES[stageIdx];
+    const progress = (state.xp - cur.minXP) / (next.minXP - cur.minXP);
+    xpFill.style.width = (progress*100).toFixed(1) + '%';
+  } else {
+    xpNextEl.textContent = '∞';
+    xpFill.style.width = '100%';
+  }
+
+  const todayMin = Math.floor(todaySeconds()/60);
+  todayMinEl.textContent = todayMin;
+  goalMinEl.textContent = state.goalMin;
+  goalFill.style.width = Math.min(100, (todayMin/state.goalMin)*100).toFixed(1) + '%';
+
+  totalStatEl.textContent = formatDuration(state.totalFocusSeconds);
+  sessionsStatEl.textContent = state.sessions;
+  bestStreakEl.textContent = state.bestStreak;
+  streakText.textContent = formatStreak(state.streak);
+  if (state.streak >= 2) streakBadge.classList.add('hot'); else streakBadge.classList.remove('hot');
+
+  applyMood(tempEmotion || computeMood());
+  applyStageColors();
+  updatePipUI();
+
+  if (document.activeElement !== nameInput) nameInput.value = state.petName;
+  if (document.activeElement !== focusInput) focusInput.value = Math.round(state.focusDuration/60);
+  if (document.activeElement !== goalInput) goalInput.value = state.goalMin;
+}
+
+/* =========================================================
+   ЯЗЫК
+========================================================= */
+function buildLangMenu() {
+  langMenu.innerHTML = LANG_INFO.map(l =>
+    `<button class="lang-option ${l.code===state.lang?'active':''}" data-lang="${l.code}">
+      <span class="flag">${l.flag}</span><span>${l.name}</span>
+    </button>`
+  ).join('');
+  langMenu.querySelectorAll('.lang-option').forEach(btn => {
+    btn.addEventListener('click', () => selectLanguage(btn.dataset.lang));
+  });
+}
+function selectLanguage(code) {
+  if (!I18N[code]) return;
+  state.lang = code;
+  saveState();
+  langMenu.classList.remove('open');
+  applyLanguage();
+}
+function applyLanguage() {
+  document.documentElement.lang = state.lang;
+  document.title = t('title');
+
+  dragHint.textContent = t('dragHint');
+  modeBtns[0].textContent = t('modeFocus');
+  modeBtns[1].textContent = t('modeShort');
+  modeBtns[2].textContent = t('modeLong');
+
+  todayLabelEl.textContent = t('today');
+  minUnitEl.textContent = t('min');
+
+  totalLabelEl.textContent = t('total');
+  sessionsLabelEl.textContent = t('sessionsLabel');
+  bestStreakLabelEl.textContent = t('bestStreakLabel');
+
+  soundBtn.title = t('soundTitle');
+  soundBtn.setAttribute('aria-label', t('soundTitle'));
+  musicBtn.title = t('musicTitle');
+  musicBtn.setAttribute('aria-label', t('musicTitle'));
+  pipBtn.title = t('pipTitle');
+  pipBtn.setAttribute('aria-label', t('pipTitle'));
+  achBtn.title = t('achTitle').replace('🏆 ','');
+  achBtn.setAttribute('aria-label', t('achTitle').replace('🏆 ',''));
+  langBtn.title = t('langTitle');
+  langBtn.setAttribute('aria-label', t('langTitle'));
+  settingsBtn.title = t('settingsTitle');
+  settingsBtn.setAttribute('aria-label', t('settingsTitle'));
+  resetBtn.title = t('resetTitle');
+  resetBtn.setAttribute('aria-label', t('resetTitle'));
+
+  nameLabelEl.textContent = t('nameLabel');
+  focusLabelEl.textContent = t('focusLabel');
+  goalLabelEl.textContent = t('goalLabel');
+  lofiLabelEl.textContent = t('lofiLabel');
+  resetAllBtn.textContent = t('resetProgress');
+
+  achTitleEl.textContent = t('achTitle');
+  achClose.title = t('closeTitle');
+  achClose.setAttribute('aria-label', t('closeTitle'));
+
+  buildLangMenu();
+  render();
+  renderAchGrid();
+  updateStartBtn();
+  updateMusicLabel();
+  updatePipUI();
+}
+langBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  langMenu.classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!langMenu.classList.contains('open')) return;
+  if (e.target.closest('.lang-wrap')) return;
+  langMenu.classList.remove('open');
+});
+
+/* =========================================================
+   ВЫБОР ПЕРСОНАЖА
+========================================================= */
+function buildCharPicker() {
+  charPicker.innerHTML = '';
+  Object.keys(CHARACTERS).forEach(key => {
+    const c = CHARACTERS[key];
+    const btn = document.createElement('button');
+    btn.className = 'char-btn';
+    btn.title = c.name;
+    btn.textContent = c.emoji;
+    btn.dataset.char = key;
+    if (key === state.character) btn.classList.add('active');
+    btn.addEventListener('click', () => selectCharacter(key));
+    charPicker.appendChild(btn);
+  });
+}
+function selectCharacter(key) {
+  if (!CHARACTERS[key]) return;
+  const oldDefault = CHARACTERS[state.character]?.name;
+  const wasDefaultName = state.petName === oldDefault;
+  state.character = key;
+  if (wasDefaultName || !state.petName) state.petName = CHARACTERS[key].name;
+  saveState();
+  renderPet(); render(); buildCharPicker();
+  petWrapper.classList.add('react-jump');
+  setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  spawnParticles(['✨','👋','💫'], 4);
+  playSound('click');
+  lastInteraction = Date.now();
+}
+
+/* =========================================================
+   КЛИК / DRAG
+========================================================= */
+let isDragging = false, dragStart = null, hasMoved = false;
+function handlePointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  isDragging = true; hasMoved = false;
+  const p = getPointFromEvent(e);
+  dragStart = { x: p.x, y: p.y };
+  petWrapper.style.animation = 'none';
+  petWrapper.classList.remove('snapping');
+}
+function getPointFromEvent(e) {
+  if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+function handlePointerMove(e) {
+  if (!isDragging || !dragStart) return;
+  const p = getPointFromEvent(e);
+  const dx = p.x - dragStart.x, dy = p.y - dragStart.y;
+  if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) hasMoved = true;
+  if (!hasMoved) return;
+  if (e.cancelable) e.preventDefault();
+  const stretchX = Math.max(0.6, Math.min(1.7, 1 + dx/190));
+  const stretchY = Math.max(0.6, Math.min(1.7, 1 + dy/190));
+  const sx = stretchX / Math.sqrt(Math.max(0.1, stretchY));
+  const sy = stretchY / Math.sqrt(Math.max(0.1, stretchX));
+  const clampedX = Math.max(0.55, Math.min(1.75, sx));
+  const clampedY = Math.max(0.55, Math.min(1.75, sy));
+  const rotate = Math.max(-12, Math.min(12, dx*0.045));
+  petWrapper.style.transform = `scale(${clampedX.toFixed(3)}, ${clampedY.toFixed(3)}) rotate(${rotate.toFixed(2)}deg)`;
+  lastInteraction = Date.now();
+  if (pupils.length) {
+    const maxOff = 5;
+    const ox = Math.max(-maxOff, Math.min(maxOff, dx*0.05));
+    const oy = Math.max(-maxOff, Math.min(maxOff, dy*0.05));
+    pupils.forEach(p2 => p2.style.transform = `translate(${ox}px, ${oy}px)`);
+  }
+}
+function handlePointerUp() {
+  if (!isDragging) return;
+  isDragging = false;
+  if (!hasMoved) handleClick();
+  else {
+    petWrapper.classList.add('snapping');
+    petWrapper.style.transform = '';
+    setTimeout(() => { petWrapper.classList.remove('snapping'); petWrapper.style.animation = ''; }, 600);
+    if (pupils.length) pupils.forEach(p2 => p2.style.transform = '');
+  }
+  dragStart = null; hasMoved = false;
+}
+function handleClick() {
+  lastInteraction = Date.now();
+  stageEl.classList.add('played');
+  petWrapper.classList.add('react-click');
+  setTimeout(() => petWrapper.classList.remove('react-click'), 450);
+  spawnParticles(['💖','✨','⭐','💫'], 5);
+  playSound('click');
+  setTemporaryEmotion('happy', 1500);
+}
+petWrapper.addEventListener('mousedown', handlePointerDown);
+petWrapper.addEventListener('touchstart', handlePointerDown, { passive: true });
+document.addEventListener('mousemove', handlePointerMove);
+document.addEventListener('touchmove', handlePointerMove, { passive: false });
+document.addEventListener('mouseup', handlePointerUp);
+document.addEventListener('touchend', handlePointerUp);
+
+document.addEventListener('mousemove', e => {
+  if (isDragging) return;
+  const rect = petWrapper.getBoundingClientRect();
+  if (!rect.width) return;
+  const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+  const dx = (e.clientX - cx)/rect.width, dy = (e.clientY - cy)/rect.height;
+  const maxOff = 4;
+  const ox = Math.max(-maxOff, Math.min(maxOff, dx*maxOff*1.6));
+  const oy = Math.max(-maxOff, Math.min(maxOff, dy*maxOff*1.6));
+  pupils.forEach(p => p.style.transform = `translate(${ox}px, ${oy}px)`);
+});
+
+/* =========================================================
+   ТАЙМЕР
+========================================================= */
+function switchMode(mode) {
+  if (timer.running) return;
+  timer.mode = mode;
+  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  if (mode === 'focus') timer.duration = state.focusDuration;
+  else if (mode === 'short') timer.duration = state.shortBreak;
+  else timer.duration = state.longBreak;
+  timer.remaining = timer.duration;
+  updateClockUI(); updateStartBtn();
+}
+function updateClockUI() {
+  clockEl.textContent = formatClock(timer.remaining);
+  clockEl.classList.toggle('warning', timer.remaining <= 60 && timer.running);
+  clockEl.classList.toggle('blink', timer.remaining <= 10 && timer.running);
+  updatePipUI();
+}
+function updateStartBtn() {
+  if (timer.running) {
+    startBtn.textContent = t('pause');
+    startBtn.classList.add('running');
+    timerStateEl.textContent = timer.mode === 'focus' ? t('timerFocusing') : t('timerResting');
+    timerStateEl.classList.add('active');
+  } else {
+    const hasProgress = timer.remaining < timer.duration;
+    startBtn.textContent = hasProgress ? t('resume')
+      : (timer.mode === 'focus' ? t('startFocus')
+      : timer.mode === 'short' ? t('startBreak') : t('startRest'));
+    startBtn.classList.remove('running');
+    timerStateEl.textContent = timer.mode === 'focus' ? t('timerReady') : t('timerBreakReady');
+    timerStateEl.classList.remove('active');
+  }
+  updatePipUI();
+}
+function startTimer() {
+  lastInteraction = Date.now();
+  if (timer.running) {
+    timer.running = false; timer.endAt = null;
+    updateStartBtn(); updateClockUI();
+    return;
+  }
+  timer.running = true;
+  timer.endAt = Date.now() + timer.remaining*1000;
+  updateStartBtn();
+  if (timer.mode === 'focus') {
+    applyMood('focused');
+    petWrapper.classList.add('react-stretch');
+    setTimeout(() => petWrapper.classList.remove('react-stretch'), 700);
+  }
+  playSound('start');
+  tick();
+}
+function resetTimer() {
+  timer.running = false; timer.endAt = null;
+  timer.remaining = timer.duration;
+  updateClockUI(); updateStartBtn();
+  applyMood(tempEmotion || computeMood());
+}
+function tick() {
+  if (!timer.running) return;
+  const now = Date.now();
+  const remaining = Math.max(0, Math.ceil((timer.endAt - now)/1000));
+  timer.remaining = remaining;
+  updateClockUI();
+  if (remaining <= 0) { completeSession(); return; }
+  setTimeout(tick, 250);
+}
+function completeSession() {
+  timer.running = false; timer.endAt = null;
+  if (timer.mode === 'focus') {
+    const minutesFocused = Math.round(timer.duration/60);
+    state.xp += minutesFocused;
+    state.totalFocusSeconds += timer.duration;
+    state.sessions += 1;
+    const key = todayKey();
+    state.daily[key] = (state.daily[key] || 0) + timer.duration;
+    const yest = yesterdayKey();
+    if (state.lastFocusDate === key) { /* same day */ }
+    else if (state.lastFocusDate === yest) state.streak += 1;
+    else state.streak = 1;
+    state.lastFocusDate = key;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    saveState();
+    celebrate();
+    checkAchievements();
+    timerStateEl.textContent = t('sessionDone').replace('{n}', minutesFocused);
+    setTimeout(() => switchMode(state.sessions % 4 === 0 ? 'long' : 'short'), 1200);
+  } else {
+    timerStateEl.textContent = t('breakDone');
+    playSound('breakEnd');
+    setTimeout(() => switchMode('focus'), 1200);
+  }
+  updateClockUI(); updateStartBtn(); render();
+}
+function celebrate() {
+  playSound('complete');
+  petWrapper.classList.add('react-jump');
+  setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  spawnParticles(['💖','✨','⭐','💫','🌟'], 12);
+  setTemporaryEmotion('happy', 3000);
+}
+function spawnParticles(symbols, count) {
+  const rect = stageEl.getBoundingClientRect();
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = symbols[Math.floor(Math.random()*symbols.length)];
+    p.style.left = (rect.width/2 + (Math.random()-0.5)*120) + 'px';
+    p.style.top = (rect.height*0.55 + (Math.random()-0.5)*40) + 'px';
+    p.style.setProperty('--dx', ((Math.random()-0.5)*130) + 'px');
+    p.style.animationDelay = (Math.random()*0.25) + 's';
+    stageEl.appendChild(p);
+    setTimeout(() => p.remove(), 2400);
+  }
+}
+
+/* =========================================================
+   ЗВУКИ
+========================================================= */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, startOffset, duration, type = 'sine', volume = 0.22) {
+  const ctx = getAudioCtx();
+  if (!ctx || !state.soundOn) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startOffset;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0); osc.stop(t0 + duration + 0.05);
+}
+function playSound(type) {
+  if (!state.soundOn) return;
+  if (type === 'start') { tone(660, 0, 0.15, 'sine', 0.15); tone(880, 0.08, 0.2, 'sine', 0.12); }
+  else if (type === 'click') { tone(880, 0, 0.08, 'sine', 0.13); tone(1320, 0.04, 0.12, 'sine', 0.1); }
+  else if (type === 'complete') { tone(523.25,0,0.35,'sine',0.2); tone(659.25,0.12,0.35,'sine',0.2); tone(783.99,0.24,0.5,'sine',0.22); tone(1046.5,0.38,0.7,'sine',0.18); }
+  else if (type === 'breakEnd') { tone(880,0,0.15,'triangle',0.15); tone(880,0.2,0.15,'triangle',0.15); tone(1174.66,0.4,0.35,'triangle',0.18); }
+  else if (type === 'ach') { tone(587.33,0,0.2,'sine',0.18); tone(880,0.08,0.25,'sine',0.16); tone(1174.66,0.18,0.4,'sine',0.14); }
+}
+
+/* =========================================================
+   LOFI MUSIC ENGINE
+========================================================= */
+const LofiEngine = {
+  ctx:null, master:null, filter:null, vinylNode:null,
+  playing:false, schedId:null, nextNoteTime:0, step:0,
+  bpm:80, keyRoot:57, progression:[0,5,3,4], style:'jazzy',
+  trackStart:0, trackDuration:100, recentStyles:[],
+  STYLES: ['jazzy','dreamy','mellow','nostalgic','rainy','cosmic'],
+  SCALE: [0,2,3,5,7,8,10],
+  init() {
+    if (this.ctx) return true;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return false; }
+    this.filter = this.ctx.createBiquadFilter();
+    this.filter.type = 'lowpass'; this.filter.frequency.value = 4500; this.filter.Q.value = 0.5;
+    this.filter.connect(this.ctx.destination);
+    this.master = this.ctx.createGain(); this.master.gain.value = 0; this.master.connect(this.filter);
+    return true;
+  },
+  start() {
+    if (!this.init()) return false;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.playing = true;
+    const vol = (state.musicVolume/100) * 0.5;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 1.5);
+    this.startVinyl(); this.newTrack();
+    this.nextNoteTime = this.ctx.currentTime + 0.1; this.step = 0;
+    this.schedId = setInterval(() => this.tick(), 25);
+    return true;
+  },
+  stop() {
+    this.playing = false;
+    if (this.schedId) clearInterval(this.schedId);
+    this.schedId = null;
+    if (this.master && this.ctx) {
+      this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.master.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+    }
+    setTimeout(() => { if (!this.playing) this.stopVinyl(); }, 800);
+  },
+  setVolume(v) {
+    if (!this.master || !this.playing) return;
+    const vol = (v/100) * 0.5;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 0.3);
+  },
+  newTrack() {
+    const available = this.STYLES.filter(s => !this.recentStyles.includes(s));
+    this.style = (available.length ? available : this.STYLES)[Math.floor(Math.random()*(available.length || this.STYLES.length))];
+    this.recentStyles.push(this.style);
+    if (this.recentStyles.length > 3) this.recentStyles.shift();
+    this.bpm = 68 + Math.floor(Math.random()*22);
+    this.keyRoot = 45 + Math.floor(Math.random()*12);
+    const progs = [[0,5,3,4],[0,3,4,3],[0,5,2,4],[0,4,5,3],[5,3,0,4],[0,6,3,4],[0,2,5,4],[0,3,5,4],[0,5,6,4]];
+    this.progression = progs[Math.floor(Math.random()*progs.length)];
+    if (this.ctx) this.trackStart = this.ctx.currentTime;
+    this.trackDuration = 100 + Math.random()*80;
+    if (this.filter) {
+      const cutoffs = { jazzy:3800, dreamy:3200, mellow:4200, nostalgic:3500, rainy:3000, cosmic:4800 };
+      this.filter.frequency.cancelScheduledValues(this.ctx.currentTime);
+      this.filter.frequency.setTargetAtTime(cutoffs[this.style] || 4000, this.ctx.currentTime, 0.8);
+    }
+    updateMusicLabel();
+  },
+  secondsPerBeat() { return 60/this.bpm; },
+  secondsPer16th() { return 60/this.bpm/4; },
+  tick() {
+    if (!this.playing || !this.ctx) return;
+    if (this.ctx.currentTime - this.trackStart > this.trackDuration) this.newTrack();
+    const horizon = this.ctx.currentTime + 0.18;
+    while (this.nextNoteTime < horizon) {
+      this.scheduleStep(this.step, this.nextNoteTime);
+      this.nextNoteTime += this.secondsPer16th();
+      this.step = (this.step + 1) % 64;
+    }
+  },
+  scheduleStep(step, time) {
+    const bar = Math.floor(step/16) % 4;
+    const inBar = step % 16;
+    const degree = this.progression[bar];
+    if (inBar === 0) { this.playChord(degree, time); this.playBass(degree, time); this.playBass(degree, time + this.secondsPerBeat()*2); }
+    if (inBar===0 || inBar===6 || inBar===10) this.playKick(time);
+    if (inBar===4 || inBar===12) this.playSnare(time);
+    if (inBar % 2 === 0 && Math.random() < 0.72) this.playHat(time, inBar % 4 === 0 ? 0.055 : 0.03);
+    if (inBar===0 && Math.random()<0.35) this.playMelodyNote(time+0.05);
+    if (inBar===8 && Math.random()<0.45) this.playMelodyNote(time);
+    if (inBar===6 && Math.random()<0.15) this.playMelodyNote(time+0.02);
+  },
+  playChord(degree, time) {
+    const rootMidi = this.keyRoot + 12;
+    const notes = [0,2,4].map(o => { const idx = degree+o; const oct = Math.floor(idx/7); return rootMidi + this.SCALE[idx%7] + oct*12; });
+    const dur = this.secondsPerBeat() * 3.5;
+    notes.forEach(midi => {
+      const freq = 440 * Math.pow(2, (midi-69)/12);
+      const osc = this.ctx.createOscillator(), gain = this.ctx.createGain(), lp = this.ctx.createBiquadFilter();
+      osc.type = 'triangle'; osc.frequency.value = freq; osc.detune.value = (Math.random()-0.5)*8;
+      lp.type = 'lowpass'; lp.frequency.value = 1100 + Math.random()*500; lp.Q.value = 0.7;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.055, time + 0.4);
+      gain.gain.setValueAtTime(0.055, time + dur - 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      osc.connect(lp).connect(gain).connect(this.master);
+      osc.start(time); osc.stop(time + dur + 0.1);
+    });
+  },
+  playBass(degree, time) {
+    const midi = this.keyRoot + this.SCALE[degree%7] + Math.floor(degree/7)*12;
+    const freq = 440 * Math.pow(2, (midi-69)/12);
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain(), lp = this.ctx.createBiquadFilter();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    lp.type = 'lowpass'; lp.frequency.value = 400;
+    const dur = this.secondsPerBeat()*1.5;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.22, time+0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+dur);
+    osc.connect(lp).connect(gain).connect(this.master);
+    osc.start(time); osc.stop(time+dur+0.05);
+  },
+  playKick(time) {
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time+0.12);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.32, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+0.28);
+    osc.connect(gain).connect(this.master);
+    osc.start(time); osc.stop(time+0.32);
+  },
+  playSnare(time) {
+    const bs = Math.floor(this.ctx.sampleRate * 0.15);
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0; i<bs; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/bs, 2);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.8;
+    const gain = this.ctx.createGain(); gain.gain.value = 0.11;
+    src.connect(bp).connect(gain).connect(this.master); src.start(time);
+  },
+  playHat(time, vol) {
+    const bs = Math.floor(this.ctx.sampleRate * 0.05);
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0; i<bs; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/bs, 3);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500;
+    const gain = this.ctx.createGain(); gain.gain.value = vol || 0.04;
+    src.connect(hp).connect(gain).connect(this.master); src.start(time);
+  },
+  playMelodyNote(time) {
+    const octave = Math.floor(Math.random()*2)*12;
+    const degree = Math.floor(Math.random()*7);
+    const midi = this.keyRoot + 24 + this.SCALE[degree] + octave;
+    const freq = 440 * Math.pow(2, (midi-69)/12);
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain(), lp = this.ctx.createBiquadFilter();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    lp.type = 'lowpass'; lp.frequency.value = 2500;
+    const dur = 0.5 + Math.random()*0.8;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.045, time+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+dur);
+    osc.connect(lp).connect(gain).connect(this.master);
+    osc.start(time); osc.stop(time+dur+0.1);
+  },
+  startVinyl() {
+    if (this.vinylNode || !this.ctx) return;
+    const bs = Math.floor(this.ctx.sampleRate*3);
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0; i<bs; i++) {
+      const r = Math.random();
+      if (r < 0.003) d[i] = (Math.random()*2-1)*0.5;
+      else d[i] = (Math.random()*2-1)*0.008;
+    }
+    const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+    const gain = this.ctx.createGain(); gain.gain.value = 0.22;
+    src.connect(hp).connect(gain).connect(this.master); src.start();
+    this.vinylNode = src;
+  },
+  stopVinyl() { if (this.vinylNode) { try { this.vinylNode.stop(); } catch {} this.vinylNode = null; } }
+};
+function toggleMusic() {
+  if (LofiEngine.playing) {
+    LofiEngine.stop();
+    musicBtn.classList.remove('active','pulse');
+  } else {
+    const ok = LofiEngine.start();
+    if (!ok) { alert(t('audioFailed')); return; }
+    musicBtn.classList.add('active','pulse');
+  }
+  saveState();
+}
+function updateMusicLabel() {
+  const styleNames = { jazzy:'Jazzy', dreamy:'Dreamy', mellow:'Mellow', nostalgic:'Nostalgic', rainy:'Rainy', cosmic:'Cosmic' };
+  musicBtn.title = LofiEngine.playing
+    ? t('musicLive').replace('{style}', styleNames[LofiEngine.style] || LofiEngine.style).replace('{bpm}', LofiEngine.bpm)
+    : t('musicTitle');
+}
+
+/* =========================================================
+   PiP
+========================================================= */
+let pipWindow = null;
+async function togglePip() {
+  if (!('documentPictureInPicture' in window)) {
+    alert(t('pipNotSupported'));
+    return;
+  }
+  if (pipWindow) { try { pipWindow.close(); } catch {} pipWindow = null; pipBtn.classList.remove('active'); return; }
+  try { pipWindow = await documentPictureInPicture.requestWindow({ width: 320, height: 200 }); }
+  catch { return; }
+
+  const styleEl = pipWindow.document.createElement('style');
+  styleEl.textContent = getPipStyles();
+  pipWindow.document.head.appendChild(styleEl);
+
+  const ch = CHARACTERS[state.character] || CHARACTERS.pip;
+  pipWindow.document.body.innerHTML = `
+    <div class="pip-timer">
+      <div class="pip-top">
+        <span class="pip-pet">${ch.emoji}</span>
+        <span class="pip-mode" id="pipMode"></span>
+      </div>
+      <div class="pip-clock" id="pipClock">25:00</div>
+      <div class="pip-state" id="pipState"></div>
+      <div class="pip-actions">
+        <button class="pip-btn pip-primary" id="pipPlay"></button>
+        <button class="pip-btn pip-secondary" id="pipReset" title="↺">↺</button>
+      </div>
+    </div>
+  `;
+  pipWindow.document.getElementById('pipPlay').addEventListener('click', () => { startTimer(); updatePipUI(); });
+  pipWindow.document.getElementById('pipReset').addEventListener('click', () => { resetTimer(); updatePipUI(); });
+  pipWindow.addEventListener('pagehide', () => {
+    pipWindow = null;
+    pipBtn.classList.remove('active');
+  });
+  updatePipTheme(); updatePipUI();
+  pipBtn.classList.add('active');
+}
+function getPipStyles() {
+  return `
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { background: radial-gradient(circle at 25% 15%, rgba(var(--pet-glow), 0.22), transparent 60%), linear-gradient(160deg, var(--bg-1), #050507); color:#fff; font-family:'Inter',system-ui,-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; padding:14px; overflow:hidden; -webkit-font-smoothing:antialiased; }
+    .pip-timer { width:100%; height:100%; display:flex; flex-direction:column; gap:6px; }
+    .pip-top { display:flex; align-items:center; gap:8px; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; font-weight:700; color:rgba(255,255,255,0.5); }
+    .pip-pet { font-size:16px; } .pip-mode { color: var(--pet-1); }
+    .pip-clock { font-size:48px; font-weight:800; letter-spacing:-0.04em; line-height:1; font-variant-numeric:tabular-nums; background:linear-gradient(180deg,#fff 0%, rgba(255,255,255,0.6) 140%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .pip-clock.warning { background:linear-gradient(180deg,#ffb066 0%, #ff6b6b 140%); -webkit-background-clip:text; background-clip:text; }
+    .pip-state { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600; }
+    .pip-state.active { color: var(--pet-1); }
+    .pip-actions { display:flex; gap:8px; margin-top:auto; }
+    .pip-btn { border:none; font-family:inherit; font-weight:800; cursor:pointer; border-radius:12px; transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease; }
+    .pip-btn:active { transform: scale(0.96); }
+    .pip-primary { flex:1; padding:12px 16px; font-size:13px; background:linear-gradient(135deg, var(--pet-1), var(--pet-2)); color:#0a0a12; box-shadow:0 8px 22px rgba(var(--pet-glow), 0.28); }
+    .pip-primary:hover { filter: brightness(1.06); }
+    .pip-primary.running { background:rgba(255,255,255,0.1); color:#fff; box-shadow:none; }
+    .pip-secondary { width:44px; font-size:18px; background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.65); }
+    .pip-secondary:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  `;
+}
+function updatePipTheme() {
+  if (!pipWindow) return;
+  const root = pipWindow.document.documentElement;
+  const cs = getComputedStyle(document.documentElement);
+  root.style.setProperty('--pet-1', cs.getPropertyValue('--pet-1'));
+  root.style.setProperty('--pet-2', cs.getPropertyValue('--pet-2'));
+  root.style.setProperty('--pet-glow', cs.getPropertyValue('--pet-glow'));
+  root.style.setProperty('--bg-1', cs.getPropertyValue('--bg-1'));
+  const petEl = pipWindow.document.querySelector('.pip-pet');
+  if (petEl) petEl.textContent = (CHARACTERS[state.character] || CHARACTERS.pip).emoji;
+}
+function updatePipUI() {
+  if (!pipWindow) return;
+  const clock = pipWindow.document.getElementById('pipClock');
+  const stateEl = pipWindow.document.getElementById('pipState');
+  const modeEl = pipWindow.document.getElementById('pipMode');
+  const playBtn = pipWindow.document.getElementById('pipPlay');
+  if (!clock || !stateEl || !modeEl || !playBtn) return;
+
+  clock.textContent = formatClock(timer.remaining);
+  clock.classList.toggle('warning', timer.remaining <= 60 && timer.running);
+
+  const modeNames = { focus: t('modeFocus'), short: t('modeShort'), long: t('modeLong') };
+  modeEl.textContent = modeNames[timer.mode];
+
+  if (timer.running) {
+    stateEl.textContent = timer.mode === 'focus' ? t('timerFocusing') : t('timerResting');
+    stateEl.classList.add('active');
+    playBtn.textContent = t('pause');
+    playBtn.classList.add('running');
+  } else {
+    stateEl.textContent = timer.mode === 'focus' ? t('timerReady') : t('timerBreakReady');
+    stateEl.classList.remove('active');
+    const hasProgress = timer.remaining < timer.duration;
+    playBtn.textContent = hasProgress ? t('resume') : t('start');
+    playBtn.classList.remove('running');
+  }
+}
+
+/* =========================================================
+   ДОСТИЖЕНИЯ
+========================================================= */
+function checkAchievements() {
+  const unlocked = state.achievements || [];
+  const newlyUnlocked = [];
+  ACHIEVEMENTS.forEach(a => {
+    if (!unlocked.includes(a.id) && a.check(state)) {
+      unlocked.push(a.id);
+      newlyUnlocked.push(a);
+    }
+  });
+  if (newlyUnlocked.length) {
+    state.achievements = unlocked;
+    saveState();
+    newlyUnlocked.forEach((a, i) => setTimeout(() => showAchievementToast(a), i * 900));
+    updateAchCount();
+    renderAchGrid();
+  }
+  return newlyUnlocked;
+}
+function showAchievementToast(a) {
+  playSound('ach');
+  const info = (t('ach') || {})[a.id] || ['', ''];
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <div class="t-icon">${a.icon}</div>
+    <div class="t-body">
+      <div class="t-label">${t('newAchievement')}</div>
+      <div class="t-name">${info[0]}</div>
+      <div class="t-desc">${info[1]}</div>
+    </div>
+  `;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('leaving');
+    setTimeout(() => toast.remove(), 500);
+  }, 4200);
+}
+function renderAchGrid() {
+  if (!achGrid) return;
+  const unlocked = state.achievements || [];
+  const dict = t('ach') || {};
+  achGrid.innerHTML = ACHIEVEMENTS.map(a => {
+    const isUnlocked = unlocked.includes(a.id);
+    const info = dict[a.id] || ['', ''];
+    return `
+      <div class="ach-card ${isUnlocked ? 'unlocked' : 'locked'}">
+        <div class="ach-icon">${isUnlocked ? a.icon : '🔒'}</div>
+        <div class="ach-info">
+          <div class="ach-name">${info[0]}</div>
+          <div class="ach-desc">${info[1]}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateAchCount();
+}
+function updateAchCount() {
+  if (!achCount) return;
+  const unlocked = (state.achievements || []).length;
+  achCount.textContent = `${unlocked} / ${ACHIEVEMENTS.length}`;
+}
+function openAchModal() { renderAchGrid(); achModal.classList.add('open'); }
+function closeAchModal() { achModal.classList.remove('open'); }
+
+/* =========================================================
+   СОБЫТИЯ
+========================================================= */
+startBtn.addEventListener('click', startTimer);
+resetBtn.addEventListener('click', resetTimer);
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (timer.running) { timer.running = false; timer.endAt = null; }
+    switchMode(btn.dataset.mode);
+  });
+});
+settingsBtn.addEventListener('click', () => settingsPanel.classList.toggle('open'));
+soundBtn.addEventListener('click', () => {
+  state.soundOn = !state.soundOn;
+  soundBtn.classList.toggle('muted', !state.soundOn);
+  saveState();
+});
+musicBtn.addEventListener('click', toggleMusic);
+pipBtn.addEventListener('click', togglePip);
+achBtn.addEventListener('click', openAchModal);
+achClose.addEventListener('click', closeAchModal);
+achModal.addEventListener('click', (e) => { if (e.target === achModal) closeAchModal(); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (achModal.classList.contains('open')) { closeAchModal(); return; }
+    if (langMenu.classList.contains('open')) { langMenu.classList.remove('open'); return; }
+  }
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); startTimer(); }
+  if (e.code === 'KeyR') { e.preventDefault(); resetTimer(); }
+});
+
+nameInput.addEventListener('input', e => {
+  state.petName = e.target.value.trim() || CHARACTERS[state.character].name;
+  petNameEl.textContent = state.petName;
+  saveState();
+});
+focusInput.addEventListener('change', e => {
+  const min = Math.max(1, Math.min(180, parseInt(e.target.value) || 25));
+  state.focusDuration = min * 60;
+  saveState();
+  if (timer.mode === 'focus' && !timer.running && timer.remaining === timer.duration) switchMode('focus');
+});
+goalInput.addEventListener('change', e => {
+  const min = Math.max(10, Math.min(600, parseInt(e.target.value) || 60));
+  state.goalMin = min;
+  saveState();
+  render();
+});
+musicVolInput.addEventListener('input', e => {
+  state.musicVolume = parseInt(e.target.value) || 45;
+  LofiEngine.setVolume(state.musicVolume);
+  saveState();
+});
+resetAllBtn.addEventListener('click', () => {
+  if (!confirm(t('resetConfirm'))) return;
+  const ch = state.character;
+  const keepVolume = state.musicVolume;
+  const keepLang = state.lang;
+  state = { ...defaultState, character: ch, musicVolume: keepVolume, lang: keepLang };
+  state.petName = CHARACTERS[ch].name;
+  saveState();
+  switchMode('focus');
+  renderPet(); render(); buildCharPicker(); renderAchGrid();
+});
+
+window.addEventListener('beforeunload', () => saveState());
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
+setInterval(() => { saveState(); render(); }, 60000);
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ
+========================================================= */
+function init() {
+  if (!state.lang || !I18N[state.lang]) {
+    state.lang = detectLanguage();
+    saveState();
+  }
+  if (!state.petName) state.petName = CHARACTERS[state.character].name;
+  if (!Array.isArray(state.achievements)) state.achievements = [];
+
+  soundBtn.classList.toggle('muted', !state.soundOn);
+  musicVolInput.value = state.musicVolume ?? 45;
+  buildCharPicker();
+  renderPet();
+  switchMode('focus');
+  timer.duration = state.focusDuration;
+  timer.remaining = timer.duration;
+  applyLanguage();
+  updateClockUI();
+  updateStartBtn();
+  render();
+  renderAchGrid();
+
+  startBlinking();
+  startIdleBehavior();
+  setTimeout(() => checkAchievements(), 1500);
+  setTimeout(() => {
+    petWrapper.classList.add('react-jump');
+    spawnParticles(['✨','💫'], 3);
+    setTimeout(() => petWrapper.classList.remove('react-jump'), 900);
+  }, 500);
+}
+init();
+</script>
+</body>
+</html>
